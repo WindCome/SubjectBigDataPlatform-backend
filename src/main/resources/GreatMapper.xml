@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.ggkgl.Mapper.GreatMapper">
+    <insert id="insert" statementType="STATEMENT">
+        insert into ${tableName}
+        <foreach collection="keys" item="item" index="index" open="("
+                 separator="," close=")">
+            ${item}
+        </foreach>
+        <foreach item="item" index="index" collection="attributes"
+                 open="values (" separator="," close=")">'${item}'</foreach>
+    </insert>
+
+    <select id="desc" statementType="STATEMENT" resultType="HashMap">
+        select * from ${tableName} limit ${start} ,${length}
+    </select>
+
+    <select id="searchByName" statementType="STATEMENT">
+        select * from ${tableName} where
+    </select>
+
+    <update id="update" statementType="STATEMENT">
+        update ${tableName} set
+        <foreach collection="changeList" item="change"
+                 index="index"  separator=",">
+            ${change.key}= '${change.value}'
+        </foreach>
+        <where>
+            id=${Id}
+        </where>
+    </update>
+
+
+
+    <delete id="delete" statementType="STATEMENT">
+        delete from ${tableName} where Id=${Id}
+    </delete>
+
+</mapper>
