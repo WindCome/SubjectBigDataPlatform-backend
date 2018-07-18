@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://211.71.15.42:3306/bkdata?useSSL=false
+    username: root
+    password: g304g304
+  jpa:
+    hibernate:
+      ddl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    show-sql: true
+    database: mysql
+    database-platform: org.hibernate.dialect.MySQL5InnoDBDialect
+server:
+  port: 8081
+mybatis:
+  mapper-locations: classpath:GreatMapper.xml
+  config-location: classpath:mybatis.xml
