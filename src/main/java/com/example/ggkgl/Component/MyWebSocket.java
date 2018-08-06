@@ -16,7 +16,11 @@ import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-@ServerEndpoint(value = "/websocket/{tableId}/{flag}")
+
+/**
+ * 用于批量保存所有数据的websocket，为了支持实时返回保存进度而建立。
+ */
+@ServerEndpoint(value = "/websocket/{tableId}")
 @Component
 public class MyWebSocket {
     //静态变量，用来记录当前在线连接数。应该把它设计成线程安全的。
@@ -28,7 +32,6 @@ public class MyWebSocket {
     //与某个客户端的连接会话，需要通过它来给客户端发送数据
     private Session session;
     private int tableId;
-    private int flag;
     private static ApplicationContext applicationContext;
     private UpdateController updateController;
     private String status="false";
@@ -37,10 +40,9 @@ public class MyWebSocket {
     /**
      * 连接建立成功调用的方法*/
     @OnOpen
-    public void onOpen(Session session,@PathParam("tableId")int tableId,@PathParam("flag")int flag) {
+    public void onOpen(Session session,@PathParam("tableId")int tableId) {
         this.session = session;
         this.tableId=tableId;
-        this.flag=flag;
         webSocketSet.add(this);     //加入set中
         addOnlineCount();           //在线数加1
         System.out.println("有新连接加入！当前在线人数为" + getOnlineCount());
@@ -77,7 +79,7 @@ public class MyWebSocket {
             int NO=i+1;
             String status=jsonArray.getJSONObject(i).getString("status");
             if(status.equals("update")||status.equals("new")) {
-                if (!updateController.upgradeSave(i, tableId, flag)) {
+                if (!updateController.upgradeSave(i, tableId)) {
                     session.getBasicRemote().sendObject(-1);
                     System.out.println(NO);
                     return ;

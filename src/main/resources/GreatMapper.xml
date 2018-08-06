@@ -14,7 +14,9 @@
     <select id="desc" statementType="STATEMENT" resultType="HashMap">
         select * from ${tableName} order by ${order} desc, modify_time desc limit ${start} ,${length}
     </select>
-
+    <select id="display" statementType="STATEMENT" resultType="HashMap">
+        select * from ${tableName} limit ${start} ,${length}
+    </select>
 
 
     <select id="getSize" statementType="STATEMENT" resultType="Integer">

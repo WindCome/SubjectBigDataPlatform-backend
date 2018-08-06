@@ -10,6 +10,6 @@ public class GgkglApplication {
 
     public static void main(String[] args) {
         ConfigurableApplicationContext applicationContext=SpringApplication.run(GgkglApplication.class, args);
-        MyWebSocket.setApplicationContext(applicationContext);
+        MyWebSocket.setApplicationContext(applicationContext);//使websocket可以注入其他类。
     }
 }

@@ -12,6 +12,8 @@ import java.util.Map;
 @Mapper
 public interface GreatMapper {
     public void insert(Map<String, Object> params);
+    public List<HashMap> display(@Param("tableName") String tableName,
+                                 @Param("start") int start,@Param("length") int length);
     public List<HashMap> desc(@Param("tableName") String tableName,
                               @Param("start") int start,@Param("length") int length,@Param("order")String order );
     public void update(Map<String ,Object> params);

@@ -2,50 +2,49 @@ package com.example.ggkgl.Controller;
 
 import com.csvreader.CsvReader;
 import com.example.ggkgl.AssitClass.Change;
-import com.example.ggkgl.Component.MyWebSocket;
 import com.example.ggkgl.Mapper.GreatMapper;
-import com.example.ggkgl.Repository.MDRepository;
-import com.fasterxml.jackson.annotation.JsonAlias;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.mapping.ResultMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
 
-import javax.management.ObjectName;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 
+/**
+ * 包含所有更新相关的接口和搜索接口
+ */
 @RestController
 @CrossOrigin
 public class UpdateController {
     @Autowired
     private GreatMapper greatMapper;
-    @Autowired
-    private MDRepository mdRepository;
 
     @Autowired
-    AcademicianController academicianController;
-    public void execCrawl()
-    {
-        try
-        {
-            Process process=Runtime.getRuntime().exec("activate && F:\\大三下学习\\YangtzeRiverScholar-master\\YangtzeRiverScholar\\run.py");
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-        }
-    }
+    AllController allController;
+//    public void execCrawl()
+//    {
+//        try
+//        {
+//            Process process=Runtime.getRuntime().exec("activate && F:\\大三下学习\\YangtzeRiverScholar-master\\YangtzeRiverScholar\\run.py");
+//        }
+//        catch (Exception e)
+//        {
+//            e.printStackTrace();
+//        }
+//    }
 
+    /**
+     * 获取更新列表
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @param page 分页
+     * @param size  分页
+     * @param condition 筛选状态（具体见api文档）
+     * @return 返回更新数据列表
+     */
     @GetMapping(value = "/upgrade/{tableId}")
     public JSONArray contrast(@PathVariable("tableId") int tableId, @RequestParam("page") int page
             ,@RequestParam("size") int size,@RequestParam(value = "status",defaultValue = "all") String condition)
@@ -107,9 +106,14 @@ public class UpdateController {
         return showArray;
     }
 
+    /**
+     * 保存单条更新数据
+     * @param Index 更新数据的index
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @return  true成功 false失败
+     */
     @GetMapping(value = "/upgradeSave/{tableId}")
-    public  Boolean upgradeSave(@RequestParam("index") int Index,@PathVariable("tableId") int tableId
-            ,@RequestParam("flag") int flag)
+    public  Boolean upgradeSave(@RequestParam("index") int Index,@PathVariable("tableId") int tableId)
     {
         Jedis jedis=new Jedis();
         String jsonStr=jedis.get("upgrade"+tableId);
@@ -125,12 +129,12 @@ public class UpdateController {
         }
         Boolean result=false;
         if(status.equals("new")) {
-            result = academicianController.add(tableId, addObject, flag);
+            result = allController.add(tableId, addObject);
         }
         else if(status.equals("update"))
         {
             String Id=jsonObject.getString("Id");
-            result=academicianController.update(tableId,Id,flag,addObject);
+            result= allController.update(tableId,Id,addObject);
         }
         System.out.println(result);
         if (result)
@@ -139,6 +143,14 @@ public class UpdateController {
         }
         return result;
     }
+
+    /**
+     * 修改某条更新数据
+     * @param Index 更新数据index
+     * @param tableId  表的Id（即保存在META_ENTITY中的自增字段）
+     * @param changes  更新数据json具体格式样例见api文档
+     * @return true成功 false失败
+     */
     @PostMapping(value = "/upgrade/modify/{tableId}")
     public Boolean modify(@RequestParam("index") int Index,@PathVariable("tableId") int tableId,
                        @RequestBody JSONObject changes)
@@ -164,24 +176,12 @@ public class UpdateController {
         return true;
     }
 
-    @GetMapping(value = "/upgrade/saveAll/{tableId}")
-    public Boolean saveAll(@PathVariable("tableId")int tableId,@RequestParam("flag") int flag)
-    {
-        Jedis jedis=new Jedis();
-        String jsonStr=jedis.get("upgrade"+tableId);
-        JSONArray jsonArray=JSONArray.fromObject(jsonStr);
-        for(int i=0;i<jsonArray.size();i++) {
-            int NO=i+1;
-            String status=jsonArray.getJSONObject(i).getString("status");
-            if(status.equals("update")||status.equals("new")) {
-                if (!upgradeSave(i, tableId, flag)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
+    /**
+     * 删除某条更新数据
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @param index 更新数据的index
+     * @return true成功，false失败
+     */
     @GetMapping(value = "/upgrade/delete/{tableId}")
     public Boolean delete(@PathVariable("tableId")int tableId,@RequestParam("index")int index)
     {
@@ -199,11 +199,17 @@ public class UpdateController {
         return true;
     }
 
+    /**
+     * 生成更新数据
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @param year 更新数据的年份
+     * @return  true成功  false失败
+     */
     @GetMapping(value = "/generateUpgrade/{tableId}")
-    public Boolean generate(@PathVariable("tableId") int tableId,@RequestParam("year") String year
-            ,@RequestParam("flag")int flag)
+    public Boolean generate(@PathVariable("tableId") int tableId,@RequestParam("year") String year)
     {
-        String tableName=mdRepository.getOne(tableId).getName();
+        int flag= allController.getFlag(tableId);
+        String tableName= allController.getTableName(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
         JSONObject configJson=allJson.getJSONObject("config");
         String fileName=configJson.getString("fileName");
@@ -287,6 +293,16 @@ public class UpdateController {
         return true;
     }
 
+    /**
+     * 转换读取csv得到的数据map为最后需要的对比后的更新数据map，此方法目前仅被generate调用
+     * @param tableName 表名
+     * @param map  读取csv得到的map
+     * @param year  更新数据的年份
+     * @param status  对比后的状态
+     * @param index 数据的主键
+     * @param sign  对应公共库表的类型
+     * @return 返回更新数据map
+     */
     public HashMap convertMap(String tableName,HashMap map,String year,String status,String index,int sign)
     {
         HashMap resultMap=new HashMap();
@@ -341,6 +357,11 @@ public class UpdateController {
         return resultMap;
     }
 
+    /**
+     * 工具类，用于读取csv转换成hashmap
+     * @param pathName csv相对路径
+     * @return  返回转换后的map
+     */
     public List<HashMap> csvToHashMap(String pathName)
     {
         List<HashMap> maps=new ArrayList<>();
@@ -372,6 +393,14 @@ public class UpdateController {
         return maps;
     }
 
+    /**
+     * 搜索更新接口
+     * @param jsonObject 搜索条件json，具体参见api文档
+     * @param tableId   表的Id（即保存在META_ENTITY中的自增字段）
+     * @param page  分页
+     * @param size  分页
+     * @return 返回搜索结构列表
+     */
     @PostMapping(value = "/searchUpgrade/{tableId}")
     public JSONArray searchUpgrade(@RequestBody JSONObject jsonObject,@PathVariable("tableId")int tableId,
                                    @RequestParam(value = "page",defaultValue = "-1") int page,
@@ -397,10 +426,6 @@ public class UpdateController {
                 isMatch=false;
             for(Object key:condition.keySet())
             {
-//                String allFlag=statusObject.getString("all");
-//                String newFlag= statusObject.getString("new");
-//                String updateFlag=statusObject.getString("update");
-//                String saveFlag=statusObject.getString("save");
                 String value1=dataObject.getJSONObject(key.toString()).getString("newValue");
                 String value2=condition.get(key).toString();
 //                System.out.println(value1);
