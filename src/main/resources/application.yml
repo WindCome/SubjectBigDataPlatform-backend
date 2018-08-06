@@ -4,6 +4,8 @@ spring:
     url: jdbc:mysql://211.71.15.42:3306/bkdata?useSSL=false
     username: root
     password: g304g304
+
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -12,8 +14,22 @@ spring:
     show-sql: true
     database: mysql
     database-platform: org.hibernate.dialect.MySQL5InnoDBDialect
+
+  redis:
+    host: 192.168.48.1
+    port: 6379
+    timeout: 300s
+  session:
+    timeout: 5000s
+
 server:
   port: 8081
+  connection-timeout: 5000s
+  servlet:
+    session:
+      timeout: 5000s
+
+
 mybatis:
   mapper-locations: classpath:GreatMapper.xml
   config-location: classpath:mybatis.xml

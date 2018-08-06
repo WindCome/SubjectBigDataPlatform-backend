@@ -11,7 +11,7 @@ public class EngineerEntity {
     private String name;
     private String link;
     private String introduce;
-    private Date evaluateTime;
+    private int evaluateTime;
     private String expertCategory;
 
     @Id
@@ -56,11 +56,11 @@ public class EngineerEntity {
 
     @Basic
     @Column(name = "evaluate_time")
-    public Date getEvaluateTime() {
+    public int getEvaluateTime() {
         return evaluateTime;
     }
 
-    public void setEvaluateTime(Date evaluateTime) {
+    public void setEvaluateTime(int evaluateTime) {
         this.evaluateTime = evaluateTime;
     }
 
