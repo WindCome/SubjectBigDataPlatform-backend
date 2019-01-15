@@ -9,9 +9,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.io.LineNumberReader;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -25,17 +30,29 @@ public class UpdateController {
 
     @Autowired
     AllController allController;
-//    public void execCrawl()
-//    {
-//        try
-//        {
-//            Process process=Runtime.getRuntime().exec("activate && F:\\大三下学习\\YangtzeRiverScholar-master\\YangtzeRiverScholar\\run.py");
-//        }
-//        catch (Exception e)
-//        {
-//            e.printStackTrace();
-//        }
-//    }
+    public void execCrawl()
+    {
+        try
+        {
+            System.out.println("====python======");
+            String result="";
+            Process process=Runtime.getRuntime().exec("scrapy crawl ConfigurableSpiders",null,new File("D:\\Project\\ConfigurableSpiders\\ConfigurableSpiders"));
+            InputStreamReader in = new InputStreamReader(process.getInputStream(),"GBK");//注意格式
+            //定义一个接受python程序处理的返回结果
+            LineNumberReader input = new LineNumberReader (in);
+            String line;
+            while ((line = input.readLine ()) != null)
+                System.out.println(line);
+            //关闭in资源
+            in.close();
+            process.waitFor();
+            System.out.println("====python======");
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * 获取更新列表
@@ -212,17 +229,16 @@ public class UpdateController {
         String tableName= allController.getTableName(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
         JSONObject configJson=allJson.getJSONObject("config");
-        String fileName=configJson.getString("fileName");
-        List<HashMap> maps=csvToHashMap(fileName);
+        this.execCrawl();
+        List<HashMap> maps=this.readFromRedis("upgrade"+tableId);
         List<HashMap> ResultMaps=new ArrayList<>();
         int count=0;
         for(int i=0;i<maps.size();i++)
         {
             HashMap item=maps.get(i);
+            System.out.println(item.toString());
             String mainKey=configJson.getString("mainKey");
             String mainValue=item.get(mainKey).toString();
-//            System.out.println(mainKey);
-//            System.out.println(mainValue);
             List<HashMap> mainMap=greatMapper.freeInspect(tableName,mainKey,mainValue);
             HashMap map=new HashMap();
             if(mainMap.size()==0)
@@ -356,6 +372,31 @@ public class UpdateController {
             resultMap.put("status",status);
         return resultMap;
     }
+
+    /**
+     * 工具类，用于读取mysql转换成hashmap
+     * @param keyWord redis键
+     * @return  返回转换后的map
+     */
+    public List<HashMap> readFromRedis(String keyWord){
+        List<HashMap> result = new ArrayList<>();
+        Jedis jedis = new Jedis();
+        String jsonStr=jedis.get(keyWord);
+        JSONArray jsonArray= JSONArray.fromObject(jsonStr);
+        System.out.println(jsonStr);
+        for(int i=0;i<jsonArray.size();i++){
+            JSONObject item=JSONObject.fromObject(jsonArray.get(i));
+            Iterator iterator = item.keys();
+            HashMap<String,Object> itemMap = new HashMap<>();
+            while (iterator.hasNext()){
+                String key = (String) iterator.next();
+                itemMap.put(key,item.get(key));
+            }
+            result.add(itemMap);
+        }
+        return result;
+    }
+
 
     /**
      * 工具类，用于读取csv转换成hashmap
