@@ -188,7 +188,7 @@ public class AllController {
             }
         }
         try {
-            greatMapper.updateDesc(tableName+"_upgrade", jsonObject.toString());
+            greatMapper.updateDesc(tableName, allJson.toString());
         }
         catch (Exception e)
         {
@@ -209,7 +209,7 @@ public class AllController {
     public List<HashMap> show(@PathVariable("tableId") int tableId
             ,@RequestParam(value = "page") int page,@RequestParam(value = "size") int size)
     {
-        String orderFactor="";
+        String orderFactor;
         int flag=getFlag(tableId);
         if(flag==1)
             orderFactor="evaluate_time";
@@ -217,7 +217,7 @@ public class AllController {
             orderFactor="PDSJ";
         String tableName=getTableName(tableId);
         int start=(page-1)*size;
-        List<HashMap> hashMaps = null;
+        List<HashMap> hashMaps;
         try{
             hashMaps=greatMapper.desc(tableName,start,size,orderFactor);
         }catch (Exception ignore){
