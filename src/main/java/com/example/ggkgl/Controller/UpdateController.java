@@ -3,6 +3,7 @@ package com.example.ggkgl.Controller;
 import com.csvreader.CsvReader;
 import com.example.ggkgl.AssitClass.Change;
 import com.example.ggkgl.Mapper.GreatMapper;
+import com.example.ggkgl.Service.SpiderService;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,9 @@ import java.util.List;
 public class UpdateController {
     @Autowired
     private GreatMapper greatMapper;
+
+    @Autowired
+    private SpiderService spiderService;
 
     @Autowired
     AllController allController;
@@ -223,90 +227,105 @@ public class UpdateController {
      * @return  true成功  false失败
      */
     @GetMapping(value = "/generateUpgrade/{tableId}")
-    public Boolean generate(@PathVariable("tableId") int tableId,@RequestParam("year") String year)
+    public long generate(@PathVariable("tableId") int tableId,@RequestParam("year") String year)
     {
         int flag= allController.getFlag(tableId);
         String tableName= allController.getTableName(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
         JSONObject configJson=allJson.getJSONObject("config");
-        this.execCrawl();
-        List<HashMap> maps=this.readFromRedis("upgrade"+tableId);
-        List<HashMap> ResultMaps=new ArrayList<>();
-        int count=0;
-        for(int i=0;i<maps.size();i++)
-        {
-            HashMap item=maps.get(i);
-            System.out.println(item.toString());
-            String mainKey=configJson.getString("mainKey");
-            String mainValue=item.get(mainKey).toString();
-            List<HashMap> mainMap=greatMapper.freeInspect(tableName,mainKey,mainValue);
-            HashMap map=new HashMap();
-            if(mainMap.size()==0)
+        JSONObject upgradeJson = allJson.getJSONObject("upgrade");
+        JSONObject command=upgradeJson.getJSONObject("command");
+        return this.spiderService.execCrawl(null, command.getString("value"), () -> {
+            List<HashMap> maps=UpdateController.this.readFromRedis("upgrade"+tableId);
+            List<HashMap> ResultMaps=new ArrayList<>();
+            int count=0;
+            for(int i=0;i<maps.size();i++)
             {
-                count++;
-                map=convertMap(tableName,item,year,"new","-1",flag);
-            }
-            else {
-                HashMap conditionMap=new HashMap();
-                conditionMap.put("tableName",tableName);
-                JSONArray jsonArray=configJson.getJSONArray("matchKeys");
-                List<Change> changes=new ArrayList<>();
-                Change mainChange=new Change();
-                mainChange.setKey(mainKey);
-                mainChange.setValue(mainValue);
-                changes.add(mainChange);
-                for(int j=0;j<jsonArray.size();j++)
+                HashMap item=maps.get(i);
+                System.out.println(item.toString());
+                String mainKey=configJson.getString("mainKey");
+                String mainValue=item.get(mainKey).toString();
+                List<HashMap> mainMap=greatMapper.freeInspect(tableName,mainKey,mainValue);
+                HashMap map=new HashMap();
+                if(mainMap.size()==0)
                 {
-                    Change change=new Change();
-                    String key=jsonArray.get(j).toString();
-                                        System.out.println(key);
-                    String value=item.get(key).toString();
-                    change.setKey(key);
-                    change.setValue(value);
-
-//                    System.out.println(value);
-                    changes.add(change);
-                }
-                conditionMap.put("conditions",changes);
-                List<HashMap> specificMap=greatMapper.comboSearch(conditionMap);
-//                System.out.println(specificMap.size());
-//                System.out.println(item.get("XM"));
-                if(specificMap.size()==0) { 
+                    count++;
                     map=convertMap(tableName,item,year,"new","-1",flag);
                 }
-                else if (specificMap.size()==1)
-                {
-                    String index="";
-                    if(flag==1) {
-                         index = specificMap.get(0).get("id").toString();
+                else {
+                    HashMap conditionMap=new HashMap();
+                    conditionMap.put("tableName",tableName);
+                    JSONArray jsonArray=configJson.getJSONArray("matchKeys");
+                    List<Change> changes=new ArrayList<>();
+                    Change mainChange=new Change();
+                    mainChange.setKey(mainKey);
+                    mainChange.setValue(mainValue);
+                    changes.add(mainChange);
+                    for(int j=0;j<jsonArray.size();j++)
+                    {
+                        Change change=new Change();
+                        String key=jsonArray.get(j).toString();
+                        System.out.println(key);
+                        String value=item.get(key).toString();
+                        change.setKey(key);
+                        change.setValue(value);
+
+//                    System.out.println(value);
+                        changes.add(change);
+                    }
+                    conditionMap.put("conditions",changes);
+                    List<HashMap> specificMap=greatMapper.comboSearch(conditionMap);
+//                System.out.println(specificMap.size());
+//                System.out.println(item.get("XM"));
+                    if(specificMap.size()==0) {
+                        map=convertMap(tableName,item,year,"new","-1",flag);
+                    }
+                    else if (specificMap.size()==1)
+                    {
+                        String index="";
+                        if(flag==1) {
+                            index = specificMap.get(0).get("id").toString();
+                        }
+                        else
+                        {
+                            index =specificMap.get(0).get("ID").toString();
+                        }
+                        map=convertMap(tableName,item,year,"update",index,flag);
                     }
                     else
                     {
-                        index =specificMap.get(0).get("ID").toString();
+                        //let it go!!!
+                        System.out.println("that is terrible!");
                     }
-                    map=convertMap(tableName,item,year,"update",index,flag);
                 }
-                else
-                {
-                    //let it go!!!
-                    System.out.println("that is terrible!");
-                }
+                ResultMaps.add(map);
             }
-            ResultMaps.add(map);
-        }
-        System.out.println(count);
-        HashMap countMap=new HashMap();
-        JSONArray jsonArray=JSONArray.fromObject(ResultMaps);
-        try {
-            Jedis jedis = new Jedis();
-            jedis.set("upgrade" + tableId, jsonArray.toString());
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-            return false;
-        }
-        return true;
+            System.out.println(count);
+            HashMap countMap=new HashMap();
+            JSONArray jsonArray=JSONArray.fromObject(ResultMaps);
+            try {
+                Jedis jedis = new Jedis();
+                jedis.set("upgrade" + tableId, jsonArray.toString());
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    /**
+     * 查看某个爬取结果是否可用
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @return  true可用  false不可用
+     */
+    @GetMapping(value = "/generateUpgrade/result/{tableId}")
+    public Boolean isDataAvailable(@PathVariable("tableId") int tableId){
+        String tableName= allController.getTableName(tableId);
+        JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
+        JSONObject upgradeJson = allJson.getJSONObject("upgrade");
+        JSONObject command=upgradeJson.getJSONObject("command");
+        return this.spiderService.isSpiderCrawlFinish(null,command.getString("value"));
     }
 
     /**

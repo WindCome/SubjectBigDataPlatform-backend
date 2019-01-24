@@ -215,7 +215,12 @@ public class AllController {
             orderFactor="PDSJ";
         String tableName=getTableName(tableId);
         int start=(page-1)*size;
-        List<HashMap> hashMaps=greatMapper.desc(tableName,start,size,orderFactor);
+        List<HashMap> hashMaps = null;
+        try{
+            hashMaps=greatMapper.desc(tableName,start,size,orderFactor);
+        }catch (Exception ignore){
+            hashMaps=greatMapper.desc(tableName,start,size,"ID");
+        }
         return hashMaps;
     }
 
