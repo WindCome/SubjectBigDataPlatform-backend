@@ -168,23 +168,25 @@ public class AllController {
     }
 
     /**
-     * 设置更新配置接口
-     * @param request（包含两个参数，source和year分别代表更新数据源和年份）
-     * @param tableId
+     * 设置更新配置接口,配置参数修改
+     * @param request 使用request中的param传递需要修改的配置
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
      * @return true成功 false失败
      */
     @PostMapping(value = "/setConfig/{tableId}")
     public Boolean setConfig(HttpServletRequest request,@PathVariable("tableId")int tableId)
     {
         String tableName=getTableName(tableId);
-        String source=request.getParameter("source");
-        String year=request.getParameter("year");
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
         JSONObject jsonObject=allJson.getJSONObject("upgrade");
-        JSONObject sourceObject=jsonObject.getJSONObject("source");
-        JSONObject yearObject=jsonObject.getJSONObject("year");
-        sourceObject.put("value",source);
-        yearObject.put("value",year);
+        Enumeration<String> names = request.getParameterNames();
+        while (names.hasMoreElements()){
+            String key = names.nextElement();
+            if(jsonObject.has(key)){
+                JSONObject jsonToUpdate = jsonObject.getJSONObject(key);
+                jsonToUpdate.put("value",request.getParameter(key));
+            }
+        }
         try {
             greatMapper.updateDesc(tableName+"_upgrade", jsonObject.toString());
         }
