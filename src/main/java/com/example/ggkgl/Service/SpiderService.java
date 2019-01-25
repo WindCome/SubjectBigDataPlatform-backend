@@ -34,23 +34,29 @@ public class SpiderService {
     public long execCrawl(String spiderPath, String execCommand,CrawlFinishCallBack callBack){
         final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
         Thread spiderThread = this.getSpiderThread(spiderPath,execCommand);
-        if(spiderThread != null){
+        if(spiderThread != null && !this.isSpiderCrawlFinish(spiderThread.getId())){
             return spiderThread.getId();
         }
         Integer hashKey = Objects.hash(execCommand, spiderPath);
         synchronized (hashKey.toString().intern()){
             if(this.spiderThreads.containsKey(hashKey)){
-                return this.spiderThreads.get(hashKey).getId();
+                long tid = this.spiderThreads.get(hashKey).getId();
+                if(!this.isSpiderCrawlFinish(tid)){
+                    return tid;
+                }
             }
             Thread thread = new Thread(() -> {
                 try {
-                    Process process = Runtime.getRuntime().exec(execCommand, null, new File(spiderExecPath));
-                    InputStreamReader in = new InputStreamReader(process.getInputStream(), "GBK");
-                    LineNumberReader input = new LineNumberReader(in);
+                    System.out.println("===star crawl=====");
+                    ProcessBuilder processBuilder = new ProcessBuilder(execCommand.split(" "));
+                    processBuilder.directory(new File(spiderExecPath));
+                    processBuilder.redirectErrorStream(true);
+                    Process process = processBuilder.start();
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream(),"utf-8"));
                     String line;
-                    while ((line = input.readLine()) != null)
+                    while ((line = bufferedReader.readLine()) != null)
                         System.out.println(line);
-                    in.close();
+                    bufferedReader.close();
                     process.waitFor();
                     if(callBack!=null){
                         System.out.println("========finished=======");
@@ -69,14 +75,19 @@ public class SpiderService {
     }
 
     /**
-     * 判断指定爬虫是否已经完成
-     * @param spiderPath 爬虫所在目录路径
-     * @param execCommand 启动命令
-     * @return  爬虫是否已经完成
+     * 查询爬虫进程是否已经结束
+     * @param tid 爬虫线程ID
+     * @return  true爬虫线程已经结束，false爬虫正在进行,null不存在该爬虫线程
      */
-    public Boolean isSpiderCrawlFinish(String spiderPath, String execCommand) {
-        Thread spiderThread = this.getSpiderThread(spiderPath,execCommand);
-        return spiderThread != null && spiderThread.getState().equals(TERMINATED);
+    public Boolean isSpiderCrawlFinish(long tid) {
+        Boolean result = null;
+        for(Thread thread :this.spiderThreads.values()){
+            if(thread.getId() == tid ){
+                Thread.State state = thread.getState();
+                result = state == TERMINATED;
+            }
+        }
+        return result;
     }
 
     private Thread getSpiderThread(String spiderPath, String execCommand){

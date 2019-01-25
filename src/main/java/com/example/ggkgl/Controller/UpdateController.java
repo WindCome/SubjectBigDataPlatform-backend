@@ -15,10 +15,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 /**
  * 包含所有更新相关的接口和搜索接口
@@ -34,29 +31,6 @@ public class UpdateController {
 
     @Autowired
     AllController allController;
-    public void execCrawl()
-    {
-        try
-        {
-            System.out.println("====python======");
-            String result="";
-            Process process=Runtime.getRuntime().exec("scrapy crawl ConfigurableSpiders",null,new File("D:\\Project\\ConfigurableSpiders\\ConfigurableSpiders"));
-            InputStreamReader in = new InputStreamReader(process.getInputStream(),"GBK");//注意格式
-            //定义一个接受python程序处理的返回结果
-            LineNumberReader input = new LineNumberReader (in);
-            String line;
-            while ((line = input.readLine ()) != null)
-                System.out.println(line);
-            //关闭in资源
-            in.close();
-            process.waitFor();
-            System.out.println("====python======");
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-        }
-    }
 
     /**
      * 获取更新列表
@@ -79,8 +53,7 @@ public class UpdateController {
         {
             return null;
         }
-        JSONArray jsonArray=new JSONArray();
-        jsonArray = JSONArray.fromObject(jsonstr);
+        JSONArray jsonArray= JSONArray.fromObject(jsonstr);
         JSONArray showArray=new JSONArray();
         int newCount=0;
         int updateConut=0;
@@ -89,8 +62,12 @@ public class UpdateController {
         for(int i=0;i<jsonArray.size();i++)
         {
 //            System.out.println(i);
-//            System.out.println(jsonArray.get(i));
-            String status=jsonArray.getJSONObject(i).getString("status");
+//            System.out.println(jsonArray.getJSONObject(i));
+            JSONObject data = jsonArray.getJSONObject(i);
+            if(!data.has("status")){
+                continue;
+            }
+            String status=data.getString("status");
             if(i>=start&&i<end) {
                 if(condition.equals("all")||condition.equals(status)) {
                    JSONObject item=jsonArray.getJSONObject(i);
@@ -124,6 +101,8 @@ public class UpdateController {
         jsonObject.put("savedCount",savedCount);
         jsonObject.put("sameCount",sameCount);
         showArray.add(jsonObject);
+        System.out.println("======showArray======");
+        System.out.println(showArray);
         return showArray;
     }
 
@@ -224,7 +203,7 @@ public class UpdateController {
      * 生成更新数据
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
      * @param year 更新数据的年份
-     * @return  true成功  false失败
+     * @return  爬虫线程id
      */
     @GetMapping(value = "/generateUpgrade/{tableId}")
     public long generate(@PathVariable("tableId") int tableId,@RequestParam("year") String year)
@@ -244,6 +223,7 @@ public class UpdateController {
                 HashMap item=maps.get(i);
                 System.out.println(item.toString());
                 String mainKey=configJson.getString("mainKey");
+                System.out.println(mainKey);
                 String mainValue=item.get(mainKey).toString();
                 List<HashMap> mainMap=greatMapper.freeInspect(tableName,mainKey,mainValue);
                 HashMap map=new HashMap();
@@ -266,17 +246,15 @@ public class UpdateController {
                         Change change=new Change();
                         String key=jsonArray.get(j).toString();
                         System.out.println(key);
-                        String value=item.get(key).toString();
+                        Object value = item.get(key);
                         change.setKey(key);
-                        change.setValue(value);
+                        change.setValue(value == null?"":value.toString());
 
 //                    System.out.println(value);
                         changes.add(change);
                     }
                     conditionMap.put("conditions",changes);
                     List<HashMap> specificMap=greatMapper.comboSearch(conditionMap);
-//                System.out.println(specificMap.size());
-//                System.out.println(item.get("XM"));
                     if(specificMap.size()==0) {
                         map=convertMap(tableName,item,year,"new","-1",flag);
                     }
@@ -316,16 +294,12 @@ public class UpdateController {
 
     /**
      * 查看某个爬取结果是否可用
-     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @param tid 生成更新数据接口返回的线程id
      * @return  true可用  false不可用
      */
-    @GetMapping(value = "/generateUpgrade/result/{tableId}")
-    public Boolean isDataAvailable(@PathVariable("tableId") int tableId){
-        String tableName= allController.getTableName(tableId);
-        JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
-        JSONObject upgradeJson = allJson.getJSONObject("upgrade");
-        JSONObject command=upgradeJson.getJSONObject("command");
-        return this.spiderService.isSpiderCrawlFinish(null,command.getString("value"));
+    @GetMapping(value = "/generateUpgrade/result/{tid}")
+    public Boolean isDataAvailable(@PathVariable("tid") int tid){
+        return this.spiderService.isSpiderCrawlFinish(tid);
     }
 
     /**
@@ -347,10 +321,10 @@ public class UpdateController {
         for (Object key : map.keySet()) {
             HashMap columnMap = new HashMap();
             String newValue=map.get(key).toString();
-            columnMap.put("newValue",newValue);
+            columnMap.put("newValue",newValue == null?"":newValue);
             if(status.equals("update")) {
                 String oldValue=greatMapper.freeSearch(tableName,key.toString(),fakeIndex);
-                columnMap.put("oldValue",oldValue);
+                columnMap.put("oldValue",oldValue == null?"":oldValue);
                 if(newValue.equals(oldValue))
                     columnMap.put("status","same");
                 else {
@@ -370,8 +344,8 @@ public class UpdateController {
             yearMap.put("newValue", year);
             if (status.equals("update")) {
                 String oldYear = greatMapper.freeSearch(tableName, "PDSJ", fakeIndex);
-                yearMap.put("oldValue", oldYear);
-                if (oldYear.equals(year)) {
+                yearMap.put("oldValue", oldYear==null?"":oldYear);
+                if (oldYear!=null && oldYear.equals(year)) {
                     yearMap.put("status", "same");
                 } else {
                     yearMap.put("status", "update");
@@ -400,6 +374,8 @@ public class UpdateController {
     public List<HashMap> readFromRedis(String keyWord){
         List<HashMap> result = new ArrayList<>();
         Jedis jedis = new Jedis();
+        System.out.println("====keyWord=====");
+        System.out.println(keyWord);
         String jsonStr=jedis.get(keyWord);
         JSONArray jsonArray= JSONArray.fromObject(jsonStr);
         System.out.println(jsonStr);
