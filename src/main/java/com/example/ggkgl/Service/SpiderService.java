@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static java.lang.Thread.State.TERMINATED;
 
 /**
- * 控制爬虫相关,当前爬虫启动参数只支持-a
+ * 控制爬虫相关
  */
 @Service
 public class SpiderService {
@@ -20,7 +20,14 @@ public class SpiderService {
 
     private ConcurrentHashMap<Integer,Thread> spiderThreads = new ConcurrentHashMap<>();
 
-    public interface CrawlFinishCallBack{
+    public interface CrawlCallBack {
+        /**
+         * 爬虫进程开始前被调用
+         */
+        void onStart();
+        /**
+         * 爬虫进程结束后被调用
+         */
         void onFinished();
     }
 
@@ -31,7 +38,7 @@ public class SpiderService {
      * @param callBack  爬虫爬取结束回调
      * @return           爬虫线程ID
      */
-    public long execCrawl(String spiderPath, String execCommand,CrawlFinishCallBack callBack){
+    public long execCrawl(String spiderPath, String execCommand,CrawlCallBack callBack){
         final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
         Thread spiderThread = this.getSpiderThread(spiderPath,execCommand);
         if(spiderThread != null && !this.isSpiderCrawlFinish(spiderThread.getId())){
@@ -47,10 +54,12 @@ public class SpiderService {
             }
             Thread thread = new Thread(() -> {
                 try {
-                    System.out.println("===star crawl=====");
                     ProcessBuilder processBuilder = new ProcessBuilder(execCommand.split(" "));
                     processBuilder.directory(new File(spiderExecPath));
                     processBuilder.redirectErrorStream(true);
+                    if(callBack!=null){
+                        callBack.onStart();
+                    }
                     Process process = processBuilder.start();
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream(),"utf-8"));
                     String line;
@@ -59,7 +68,6 @@ public class SpiderService {
                     bufferedReader.close();
                     process.waitFor();
                     if(callBack!=null){
-                        System.out.println("========finished=======");
                         callBack.onFinished();
                     }
                 }

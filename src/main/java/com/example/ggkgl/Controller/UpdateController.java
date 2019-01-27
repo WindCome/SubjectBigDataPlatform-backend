@@ -1,19 +1,20 @@
 package com.example.ggkgl.Controller;
 
 import com.csvreader.CsvReader;
-import com.example.ggkgl.AssitClass.Change;
 import com.example.ggkgl.Mapper.GreatMapper;
+import com.example.ggkgl.Service.DataManagerService;
+import com.example.ggkgl.Service.RedisVersionControlService;
 import com.example.ggkgl.Service.SpiderService;
+import com.example.ggkgl.Service.TableConfigService;
+import javafx.util.Pair;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import net.sf.json.util.JSONTokener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.io.LineNumberReader;
+import javax.annotation.Resource;
 import java.nio.charset.Charset;
 import java.util.*;
 
@@ -23,14 +24,27 @@ import java.util.*;
 @RestController
 @CrossOrigin
 public class UpdateController {
-    @Autowired
+    @Resource
     private GreatMapper greatMapper;
 
-    @Autowired
-    private SpiderService spiderService;
+    private final SpiderService spiderService;
+
+    private final AllController allController;
+
+    private final DataManagerService dataManagerService;
+
+    private final RedisVersionControlService redisVersionControlService;
+
+    private final TableConfigService tableConfigService;
 
     @Autowired
-    AllController allController;
+    public UpdateController(SpiderService spiderService, AllController allController, DataManagerService dataManagerService, RedisVersionControlService redisVersionControlService, TableConfigService tableConfigService) {
+        this.spiderService = spiderService;
+        this.allController = allController;
+        this.dataManagerService = dataManagerService;
+        this.redisVersionControlService = redisVersionControlService;
+        this.tableConfigService = tableConfigService;
+    }
 
     /**
      * 获取更新列表
@@ -41,69 +55,63 @@ public class UpdateController {
      * @return 返回更新数据列表
      */
     @GetMapping(value = "/upgrade/{tableId}")
-    public JSONArray contrast(@PathVariable("tableId") int tableId, @RequestParam("page") int page
+    public JSONObject contrast(@PathVariable("tableId") int tableId, @RequestParam("page") int page
             ,@RequestParam("size") int size,@RequestParam(value = "status",defaultValue = "all") String condition)
     {
-        int start=(page-1)*size;
-        int end=start+size;
-        Jedis jedis=new Jedis();
-        String jsonstr=jedis.get("upgrade"+tableId);
-        System.out.println(jsonstr);
-        if (jsonstr==null)
-        {
+        Pair<String,List<HashMap>> dataEntry = this.dataManagerService.getDataFromSpider(tableId);
+        if (dataEntry==null){
             return null;
         }
-        JSONArray jsonArray= JSONArray.fromObject(jsonstr);
-        JSONArray showArray=new JSONArray();
+        List<HashMap> dataList = dataEntry.getValue();
+        List<HashMap<String,Object>> contrastResult =new ArrayList<>(dataList.size());
+        for (HashMap map : dataList) {
+            contrastResult.add(this.dataManagerService.contrast(
+                    tableId,map,this.tableConfigService.getMatchKeyField(tableId)));
+        }
         int newCount=0;
-        int updateConut=0;
+        int updateCount=0;
         int savedCount=0;
         int sameCount=0;
-        for(int i=0;i<jsonArray.size();i++)
+        JSONObject showObject = new JSONObject();
+        JSONArray dataArray = new JSONArray();
+        for(int i=0,start=(page-1)*size,counter=0;i<contrastResult.size();i++)
         {
-//            System.out.println(i);
-//            System.out.println(jsonArray.getJSONObject(i));
-            JSONObject data = jsonArray.getJSONObject(i);
-            if(!data.has("status")){
-                continue;
-            }
-            String status=data.getString("status");
-            if(i>=start&&i<end) {
+            HashMap<String,Object> data = contrastResult.get(i);
+            String status=data.get("status").toString();
+            if(i>=start&&counter<size) {
                 if(condition.equals("all")||condition.equals(status)) {
-                   JSONObject item=jsonArray.getJSONObject(i);
-                   item.put("index",i);
-                    showArray.add(item);
+                   data.put("index",i);
+                   dataArray.add(data);
+                   counter++;
                 }
-                else
-                    end++;
             }
-            if(status.equals("new"))
-            {
-                newCount++;
-            }
-            else if(status.equals("update"))
-            {
-                updateConut++;
-            }
-            else if(status.equals("saved"))
-            {
-                savedCount++;
-            }
-            else if(status.equals("same"))
-            {
-                sameCount++;
+            switch (status) {
+                case "new":
+                    newCount++;
+                    break;
+                case "update":
+                    updateCount++;
+                    break;
+                case "saved":
+                    savedCount++;
+                    break;
+                case "same":
+                    sameCount++;
+                    break;
             }
         }
-        JSONObject jsonObject=new JSONObject();
-        jsonObject.put("totalCount",jsonArray.size());
-        jsonObject.put("newCount",newCount);
-        jsonObject.put("updateCount",updateConut);
-        jsonObject.put("savedCount",savedCount);
-        jsonObject.put("sameCount",sameCount);
-        showArray.add(jsonObject);
-        System.out.println("======showArray======");
-        System.out.println(showArray);
-        return showArray;
+        JSONObject summerObject=new JSONObject();
+        System.out.println("=====version=====");
+        System.out.println(dataEntry.getKey());
+        summerObject.put("version",dataEntry.getKey());
+        summerObject.put("totalCount",contrastResult.size());
+        summerObject.put("newCount",newCount);
+        summerObject.put("updateCount",updateCount);
+        summerObject.put("savedCount",savedCount);
+        summerObject.put("sameCount",sameCount);
+        showObject.put("summer",summerObject);
+        showObject.put("detail",dataArray);
+        return showObject;
     }
 
     /**
@@ -202,92 +210,27 @@ public class UpdateController {
     /**
      * 生成更新数据
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
-     * @param year 更新数据的年份
      * @return  爬虫线程id
      */
     @GetMapping(value = "/generateUpgrade/{tableId}")
-    public long generate(@PathVariable("tableId") int tableId,@RequestParam("year") String year)
+    public long generate(@PathVariable("tableId") int tableId)
     {
-        int flag= allController.getFlag(tableId);
         String tableName= allController.getTableName(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
-        JSONObject configJson=allJson.getJSONObject("config");
         JSONObject upgradeJson = allJson.getJSONObject("upgrade");
         JSONObject command=upgradeJson.getJSONObject("command");
-        return this.spiderService.execCrawl(null, command.getString("value"), () -> {
-            List<HashMap> maps=UpdateController.this.readFromRedis("upgrade"+tableId);
-            List<HashMap> ResultMaps=new ArrayList<>();
-            int count=0;
-            for(int i=0;i<maps.size();i++)
-            {
-                HashMap item=maps.get(i);
-                System.out.println(item.toString());
-                String mainKey=configJson.getString("mainKey");
-                System.out.println(mainKey);
-                String mainValue=item.get(mainKey).toString();
-                List<HashMap> mainMap=greatMapper.freeInspect(tableName,mainKey,mainValue);
-                HashMap map=new HashMap();
-                if(mainMap.size()==0)
-                {
-                    count++;
-                    map=convertMap(tableName,item,year,"new","-1",flag);
-                }
-                else {
-                    HashMap conditionMap=new HashMap();
-                    conditionMap.put("tableName",tableName);
-                    JSONArray jsonArray=configJson.getJSONArray("matchKeys");
-                    List<Change> changes=new ArrayList<>();
-                    Change mainChange=new Change();
-                    mainChange.setKey(mainKey);
-                    mainChange.setValue(mainValue);
-                    changes.add(mainChange);
-                    for(int j=0;j<jsonArray.size();j++)
-                    {
-                        Change change=new Change();
-                        String key=jsonArray.get(j).toString();
-                        System.out.println(key);
-                        Object value = item.get(key);
-                        change.setKey(key);
-                        change.setValue(value == null?"":value.toString());
-
-//                    System.out.println(value);
-                        changes.add(change);
-                    }
-                    conditionMap.put("conditions",changes);
-                    List<HashMap> specificMap=greatMapper.comboSearch(conditionMap);
-                    if(specificMap.size()==0) {
-                        map=convertMap(tableName,item,year,"new","-1",flag);
-                    }
-                    else if (specificMap.size()==1)
-                    {
-                        String index="";
-                        if(flag==1) {
-                            index = specificMap.get(0).get("id").toString();
-                        }
-                        else
-                        {
-                            index =specificMap.get(0).get("ID").toString();
-                        }
-                        map=convertMap(tableName,item,year,"update",index,flag);
-                    }
-                    else
-                    {
-                        //let it go!!!
-                        System.out.println("that is terrible!");
-                    }
-                }
-                ResultMaps.add(map);
+        return this.spiderService.execCrawl(null, command.getString("value"),
+                new SpiderService.CrawlCallBack(){
+            private String dataDump = null;
+            private Jedis jedis = new Jedis();
+            @Override
+            public void onStart() {
+                this.dataDump = jedis.get("upgrade"+tableId);
             }
-            System.out.println(count);
-            HashMap countMap=new HashMap();
-            JSONArray jsonArray=JSONArray.fromObject(ResultMaps);
-            try {
-                Jedis jedis = new Jedis();
-                jedis.set("upgrade" + tableId, jsonArray.toString());
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
+            @Override
+            public void onFinished() {
+                UpdateController.this.redisVersionControlService.contrast(
+                        tableId,dataDump,jedis.get("upgrade"+tableId));
             }
         });
     }
@@ -365,33 +308,6 @@ public class UpdateController {
             resultMap.put("status",status);
         return resultMap;
     }
-
-    /**
-     * 工具类，用于读取mysql转换成hashmap
-     * @param keyWord redis键
-     * @return  返回转换后的map
-     */
-    public List<HashMap> readFromRedis(String keyWord){
-        List<HashMap> result = new ArrayList<>();
-        Jedis jedis = new Jedis();
-        System.out.println("====keyWord=====");
-        System.out.println(keyWord);
-        String jsonStr=jedis.get(keyWord);
-        JSONArray jsonArray= JSONArray.fromObject(jsonStr);
-        System.out.println(jsonStr);
-        for(int i=0;i<jsonArray.size();i++){
-            JSONObject item=JSONObject.fromObject(jsonArray.get(i));
-            Iterator iterator = item.keys();
-            HashMap<String,Object> itemMap = new HashMap<>();
-            while (iterator.hasNext()){
-                String key = (String) iterator.next();
-                itemMap.put(key,item.get(key));
-            }
-            result.add(itemMap);
-        }
-        return result;
-    }
-
 
     /**
      * 工具类，用于读取csv转换成hashmap

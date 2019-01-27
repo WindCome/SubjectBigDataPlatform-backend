@@ -58,10 +58,23 @@
         update meta_data_2 set description='${desc}' where tableName='${tableName}'
     </update>
 
-
-
     <delete id="delete" statementType="STATEMENT">
         delete from ${tableName} where Id=${Id}
     </delete>
 
+    <select id="findPrimaryKey" statementType="STATEMENT" resultType="String">
+        SELECT column_name FROM INFORMATION_SCHEMA.`KEY_COLUMN_USAGE` WHERE table_name='${tableName}' AND constraint_name='PRIMARY'
+    </select>
+
+    <select id="findColumnType" statementType="STATEMENT" resultType="String">
+        select COLUMN_TYPE from information_schema.columns where table_name='${tableName}' AND COLUMN_NAME='${columnName}';
+    </select>
+
+    <select id="countDistinctColumn" statementType="STATEMENT" resultType="long">
+        SELECT COUNT(DISTINCT ${columnName}) FROM ${tableName}
+    </select>
+
+    <select id="findColumnName" statementType="STATEMENT" resultType="String">
+        select COLUMN_NAME from information_schema.columns where table_name='${tableName}';
+    </select>
 </mapper>
