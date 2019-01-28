@@ -65,8 +65,7 @@ public class UpdateController {
         List<HashMap> dataList = dataEntry.getValue();
         List<HashMap<String,Object>> contrastResult =new ArrayList<>(dataList.size());
         for (HashMap map : dataList) {
-            contrastResult.add(this.dataManagerService.contrast(
-                    tableId,map,this.tableConfigService.getMatchKeyField(tableId)));
+            contrastResult.add(this.dataManagerService.contrast(tableId,map));
         }
         int newCount=0;
         int updateCount=0;

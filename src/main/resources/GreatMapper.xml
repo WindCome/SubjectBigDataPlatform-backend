@@ -3,12 +3,14 @@
 <mapper namespace="com.example.ggkgl.Mapper.GreatMapper">
     <insert id="insert" statementType="STATEMENT">
         insert into ${tableName}
-        <foreach collection="keys" item="item" index="index" open="("
+        <foreach collection="data.keySet()" item="item" index="index" open="("
                  separator="," close=")">
             ${item}
         </foreach>
-        <foreach item="item" index="index" collection="attributes"
-                 open="values (" separator="," close=")">'${item}'</foreach>
+        <foreach item="item" index="index" collection="data.values()"
+                 open="values (" separator="," close=")">
+            '${item}'
+        </foreach>
     </insert>
 
     <select id="desc" statementType="STATEMENT" resultType="HashMap">
@@ -45,12 +47,16 @@
 
     <update id="update" statementType="STATEMENT">
         update ${tableName} set
-        <foreach collection="changeList" item="change"
-                 index="index"  separator=",">
-            ${change.key}= '${change.value}'
+        <foreach collection="data.keySet()" item="key" index="index"  separator=",">
+              ${key}=
+            <foreach collection="data.values()" item="value" index="index1"  separator=",">
+                <if test="index == index1">
+                    '${value}'
+                </if>
+            </foreach>
         </foreach>
         <where>
-            id=${Id}
+            id=${id}
         </where>
     </update>
 
@@ -66,8 +72,10 @@
         SELECT column_name FROM INFORMATION_SCHEMA.`KEY_COLUMN_USAGE` WHERE table_name='${tableName}' AND constraint_name='PRIMARY'
     </select>
 
+    <!-- warning!!!! 服务器上不同数据库出现同名表时会出现问题，这里简单采用limit解决，
+            如果不同数据库同名表要查询的字段类型不一致时可能会查到错误的结果-->
     <select id="findColumnType" statementType="STATEMENT" resultType="String">
-        select COLUMN_TYPE from information_schema.columns where table_name='${tableName}' AND COLUMN_NAME='${columnName}';
+        select DATA_TYPE from information_schema.columns where table_name='${tableName}' AND COLUMN_NAME='${columnName}' LIMIT 1;
     </select>
 
     <select id="countDistinctColumn" statementType="STATEMENT" resultType="long">

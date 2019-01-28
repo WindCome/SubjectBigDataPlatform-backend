@@ -137,7 +137,7 @@ public class AllController {
         params.put("keys", listKeys);
         params.put("attributes", listValues);
         try {
-            greatMapper.insert(params);
+            //greatMapper.insert(params);
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -309,7 +309,7 @@ public class AllController {
        else params.put("Id","'"+Id+"'");
        params.put("changeList",changeList);
        try {
-           greatMapper.update(params);
+           //greatMapper.update(params);
        }
        catch (Exception e)
        {

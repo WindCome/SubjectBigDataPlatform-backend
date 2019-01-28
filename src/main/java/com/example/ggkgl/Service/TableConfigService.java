@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -63,5 +64,25 @@ public class TableConfigService {
             matchKeyList.add(matchKeysConfig.toString());
         }
         return matchKeyList.toArray(new String[0]);
+    }
+
+    private static final HashMap<String,Class> mysql2JavaDataType = new HashMap<>();
+    static {
+        TableConfigService.mysql2JavaDataType.put("varchar",String.class);
+        TableConfigService.mysql2JavaDataType.put("text",String.class);
+        TableConfigService.mysql2JavaDataType.put("integer",Long.class);
+        TableConfigService.mysql2JavaDataType.put("tinyint",Integer.class);
+        TableConfigService.mysql2JavaDataType.put("float",Float.class);
+        TableConfigService.mysql2JavaDataType.put("boolean",Boolean.class);
+        // 其他类型参考https://www.cnblogs.com/jerrylz/p/5814460.html
+    }
+
+    /**
+    * 查询mysql字段数据类型
+     */
+    public Class getColumnType(int tableId,String columnName){
+        String tableName = this.getTableNameById(tableId);
+        String typeName = this.greatMapper.findColumnType(tableName,columnName);
+        return TableConfigService.mysql2JavaDataType.get(typeName.toLowerCase());
     }
 }

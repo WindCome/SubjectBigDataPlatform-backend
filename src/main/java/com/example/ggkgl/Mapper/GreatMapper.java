@@ -9,12 +9,12 @@ import java.util.Map;
 
 @Mapper
 public interface GreatMapper {
-    void insert(Map<String, Object> params);
+    void insert(@Param("tableName") String tableName,@Param("data") Map<String, String> params);
     List<HashMap> display(@Param("tableName") String tableName,
                                  @Param("start") int start,@Param("length") int length);
     List<HashMap> desc(@Param("tableName") String tableName,
                               @Param("start") int start,@Param("length") int length,@Param("order")String order );
-    void update(Map<String ,Object> params);
+    void update(@Param("tableName") String tableName,@Param("id")Object id,@Param("data") Map<String, String> params);
     void delete(@Param("tableName") String tableName,@Param("Id") String Id);
     int getSize(@Param("tableName") String tableName);
     String getDesc(@Param("tableName") String tableName);
