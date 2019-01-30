@@ -162,13 +162,15 @@ public class DataManagerService {
     }
 
     /**
+     * @param version  应用变更的mysql数据版本,在aop中使用了该参数
+     * @param tableId   mysql表id
      * @param indexOfRedisData  redis数据索引
      * @param alterInfo     修改信息
      * @return      保存结果详细信息{success:true/false(全部数据插入失败时才为false)
      *                                 ,details:[{}]}
      */
     @SuppressWarnings("unchecked")
-    public HashMap<String,Object> saveData(int tableId, List<Integer> indexOfRedisData, List<HashMap> alterInfo){
+    public HashMap<String,Object> saveData(String version,int tableId, List<Integer> indexOfRedisData, List<HashMap> alterInfo){
         Pair<String,List<HashMap>> redisData = this.getDataFromSpider(tableId);
         List<HashMap> data = redisData.getValue();
         List<HashMap<String,Object>> contrastResults = new ArrayList<>(data.size());
@@ -212,10 +214,9 @@ public class DataManagerService {
      * @param tableId   要插入的mysql表id
      * @param redisData 参考的redis数据信息
      * @param alterInfo 数据的修改信息
-     * @return true 插入成功 false 插入失败
      */
-    private boolean redis2MysqlInsert(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
-        return insertMysql(tableId,this.alterDataByInfo(redisData,alterInfo));
+    private void redis2MysqlInsert(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
+        mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.NEW);
     }
 
     /**
@@ -223,33 +224,37 @@ public class DataManagerService {
      * @param tableId   要插入的mysql表id
      * @param redisData 参考的redis数据信息
      * @param alterInfo 数据的修改信息
-     * @return true 修改成功 false 修改失败
      */
-    private boolean redis2MysqlUpdate(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
-        return insertMysql(tableId,this.alterDataByInfo(redisData,alterInfo));
-    }
-
-    @SuppressWarnings("unchecked")
-    private boolean insertMysql(int tableId,HashMap data){
-        String tableName = this.tableConfigService.getTableNameById(tableId);
-        this.greatMapper.insert(tableName,data);
-        return true;
+    private void redis2MysqlUpdate(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
+        mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.UPGRADE);
     }
 
     /**
-    * 更新mysql记录
+     * 根据一条数据更新mysql数据库
+     * @param tableId mysql表id
+     * @param data 操作的数据
+     * @param opCode 操作类型
      */
     @SuppressWarnings("unchecked")
-    private boolean updateMysql(int tableId,HashMap data){
+    public void mysqlDataRetention(int tableId,HashMap data,OperatorCode opCode){
         String tableName = this.tableConfigService.getTableNameById(tableId);
-        String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
-        Object id = data.get(primaryKey);
-        if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
-            id = "'"+id+"'";
+        switch (opCode){
+            case NEW:
+                this.greatMapper.insert(tableName,data);
+                break;
+            case UPGRADE:
+                String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+                Object id = data.get(primaryKey);
+                if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
+                    id = "'"+id+"'";
+                }
+                this.greatMapper.update(tableName,id,data);
+                break;
+            case DELETE:
+            case SAME:
+            default:
+                break;
         }
-        data.remove(primaryKey);
-        this.greatMapper.update(tableName,id,data);
-        return true;
     }
 
     /**
