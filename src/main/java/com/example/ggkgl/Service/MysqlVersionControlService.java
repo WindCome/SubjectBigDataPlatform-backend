@@ -1,6 +1,5 @@
 package com.example.ggkgl.Service;
 
-import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Mapper.RecordDetailRepository;
 import com.example.ggkgl.Mapper.RecordRepository;
 import com.example.ggkgl.Model.RecordDetailEntity;
@@ -19,8 +18,6 @@ import java.util.HashMap;
 public class MysqlVersionControlService {
     @Resource private RecordDetailRepository recordDetailRepository;
     @Resource private RecordRepository recordRepository;
-    @Resource private TableConfigService tableConfigService;
-    @Resource private GreatMapper greatMapper;
     private ThreadLocal<RecordEntity> currentGroupRecord = new ThreadLocal<>();
     private ThreadLocal<Boolean> onlyOneOp = new ThreadLocal<>();
     /**

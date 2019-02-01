@@ -4,6 +4,7 @@ import com.example.ggkgl.AssitClass.Change;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Service.DataManagerService;
+import javafx.util.Pair;
 import net.sf.json.JSONObject;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +16,9 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.transaction.Transactional;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.FileReader;
+import java.io.PrintStream;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -106,12 +109,38 @@ public class AllController {
      * 统一增加接口
      * @param tableId  mysql表id
      * @param jsonObject 增加记录需要的json对象，具体格式参照api文档
-     * @return  true 成功 false 失败
+     * @return  {"info":String}             成功时Value为null，失败时Value为出错信息
      */
     @PostMapping(value = "/add/{tableId}")
-    public Boolean add(@PathVariable("tableId") int tableId,@RequestBody JSONObject jsonObject) {
-        this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(JSONHelper.json2Map(jsonObject)),true);
-        return true;
+    public Pair<String,String> add(@PathVariable("tableId") int tableId, @RequestBody JSONObject jsonObject) {
+        try{
+            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(JSONHelper.json2Map(jsonObject)),true);
+            return new Pair<>("info",null);
+        }catch (Exception e){
+            return new Pair<>("info",this.getExceptionAllInfo(e));
+        }
+    }
+
+    private String getExceptionAllInfo(Exception ex) {
+        ByteArrayOutputStream out;
+        PrintStream pout = null;
+        String ret;
+        try {
+            out = new ByteArrayOutputStream();
+            pout = new PrintStream(out);
+            ex.printStackTrace(pout);
+            ret = new String(out.toByteArray());
+            out.close();
+        }
+        catch (Exception e) {
+            return ex.getMessage();
+        }
+        finally {
+            if (pout != null) {
+                pout.close();
+            }
+        }
+        return ret;
     }
 
     /**

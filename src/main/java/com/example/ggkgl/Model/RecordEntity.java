@@ -7,12 +7,14 @@ import org.springframework.util.StringUtils;
 import javax.persistence.*;
 import java.io.Serializable;
 import java.sql.Timestamp;
+import java.util.Collection;
 
 /**
 * Mysql一组数据变更记录摘要
  **/
 @Entity
 public class RecordEntity implements Serializable{
+    private final static String VERSION_SEPARATOR= "#";
     /**
      * 操作组ID
      */
@@ -65,7 +67,15 @@ public class RecordEntity implements Serializable{
         if(StringUtils.isEmpty(this.parentVersion)){
             return new String[0];
         }
-        return this.parentVersion.split("#");
+        return this.parentVersion.split(VERSION_SEPARATOR);
+    }
+
+    public void setParentVersion(Collection<String> parentVersions){
+        String result = StringUtils.arrayToDelimitedString(parentVersions.toArray(), VERSION_SEPARATOR);
+        if (StringUtils.isEmpty(result)) {
+            return ;
+        }
+        this.setParentVersion(result);
     }
 
     public void setParentVersion(String parentVersion) {

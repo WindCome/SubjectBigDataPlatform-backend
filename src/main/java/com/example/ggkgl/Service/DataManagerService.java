@@ -251,28 +251,6 @@ public class DataManagerService {
         }
     }
 
-    private String getExceptionAllInfo(Exception ex) {
-        ByteArrayOutputStream out;
-        PrintStream pout = null;
-        String ret;
-        try {
-            out = new ByteArrayOutputStream();
-            pout = new PrintStream(out);
-            ex.printStackTrace(pout);
-            ret = new String(out.toByteArray());
-            out.close();
-        }
-        catch (Exception e) {
-            return ex.getMessage();
-        }
-        finally {
-            if (pout != null) {
-                pout.close();
-            }
-        }
-        return ret;
-    }
-
     /**
      * 单条数据更新至Mysql数据库
      * @param tableId mysql表id
