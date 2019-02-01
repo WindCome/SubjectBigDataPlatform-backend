@@ -129,7 +129,7 @@ public class UpdateController {
         }
         Boolean result=false;
         if(status.equals("new")) {
-            result = allController.add(tableId, addObject);
+            //result = allController.add(tableId, addObject);
         }
         else if(status.equals("update"))
         {

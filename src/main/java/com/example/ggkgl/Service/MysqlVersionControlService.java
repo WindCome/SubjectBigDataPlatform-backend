@@ -8,8 +8,7 @@ import net.sf.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 
 /**
 * Mysql 版本控制相关
@@ -21,37 +20,98 @@ public class MysqlVersionControlService {
     private ThreadLocal<RecordEntity> currentGroupRecord = new ThreadLocal<>();
     private ThreadLocal<Boolean> onlyOneOp = new ThreadLocal<>();
     /**
-     * 获取版本变迁的简要说明
+     * 获取版本变迁列表
      * @return 变迁概要列表 ，数据格式如下
      *          [
      *              {
-     *                  "currentVersion":当前版本号，
-     *                  "parentVersion":父版本号，多个父版本号时以#分割，
-     *                  "updateTime":该组数据的更新时间,
-     *                  "newCount":新增数据数量，
-     *                  "updateCount":修改数据数量，
-     *                  "deleteCount":删除数据的数量
+     *                  "parentIndex":[]父版本下标，
+     *                  "childIndex":[]子版本下标
+     *                  "record":RecordEntity 记录信息
      *              },....{}
      *          ]
      */
-    public ArrayList<Object> getVersionHistorySummary(){
-        return null;
+    public List<HashMap<String,Object>> getVersionHistory(){
+        final String recordStr = "record";
+        final String parentIndexStr = "parentIndex";
+        final String childIndexStr = "childIndex";
+        List<HashMap<String,Object>> result = new ArrayList<>();
+        List<RecordEntity> recordEntities = this.recordRepository.findAll();
+        HashMap<String,Integer> version2Index = new HashMap<>();
+        for(RecordEntity x:recordEntities){
+            HashMap<String,Object> tmp =new HashMap<>(3);
+            tmp.put(recordStr,x);
+            version2Index.put(x.getCurrentVersion(),result.size());
+            result.add(tmp);
+        }
+        for(int i=0;i<result.size();i++){
+            HashMap<String,Object> x = result.get(i);
+            RecordEntity recordEntity = (RecordEntity)x.get(recordStr);
+            String[] parentVersions = recordEntity.getParentVersionArray();
+            List<Integer> parentIndexList = new ArrayList<>(parentVersions.length);
+            for(String parentVersion:parentVersions){
+                int parentIndex = version2Index.get(parentVersion);
+                parentIndexList.add(parentIndex);
+                HashMap<String,Object> parentRecordHashMap = result.get(parentIndex);
+                if(!parentRecordHashMap.containsKey(childIndexStr)){
+                    parentRecordHashMap.put(childIndexStr,new ArrayList<Integer>());
+                }
+                @SuppressWarnings("unchecked")
+                List<Integer> childIndexList = (List<Integer>) parentRecordHashMap.get(childIndexStr);
+                childIndexList.add(i);
+            }
+            x.put(parentIndexStr,parentIndexList);
+        }
+        return result;
     }
 
     /**
      * 获取最新的版本号
      */
-    public String getLatestVersion(){
-        return null;
+    public String[] getLatestVersions(){
+        List<HashMap<String,Object>> history = this.getVersionHistory();
+        int rootIndex = -1;
+        for(int i = 0;i<history.size();i++){
+            HashMap<String,Object> x = history.get(i);
+            @SuppressWarnings("unchecked")
+            List<Integer> parentIndexList = (List<Integer>)x.get("parentIndex");
+            if(parentIndexList == null || parentIndexList.size() == 0){
+                rootIndex = i;
+                break;
+            }
+        }
+        Queue<Integer> queue = new ArrayDeque<>();
+        queue.add(rootIndex);
+        List<Integer> resultIndex = new ArrayList<>();
+        while (!queue.isEmpty()){
+            int index = queue.poll();
+            @SuppressWarnings("unchecked")
+            List<Integer> childIndex = (List<Integer>)history.get(index).get("childIndex");
+            if(childIndex == null ||childIndex.size() == 0){
+                resultIndex.add(index);
+            }
+            else {
+                queue.addAll(childIndex);
+            }
+        }
+        List<String> result = new ArrayList<>(resultIndex.size());
+        for(int x :resultIndex){
+            RecordEntity record = (RecordEntity)history.get(x).get("record");
+            result.add(record.getCurrentVersion());
+        }
+        return result.toArray(new String[0]);
     }
 
     /**
      * 生成一组数据的更改记录
      * @param opCount 该组操作的数量
      */
-    public RecordEntity generateRecord(int opCount){
+    public RecordEntity generateRecord(int opCount) throws Exception {
         RecordEntity groupRecord = new RecordEntity();
-        String version =this.getLatestVersion();
+        String[] currentVersions = this.getLatestVersions();
+        if(currentVersions.length>1){
+            throw new Exception("需要合并");
+        }
+        String version = currentVersions[0];
         groupRecord.setParentVersion(version);
         groupRecord.setOpCount(opCount);
         groupRecord = this.recordRepository.save(groupRecord);
@@ -63,7 +123,7 @@ public class MysqlVersionControlService {
     /**
     * 生成一条数据的更改记录
      */
-    public RecordDetailEntity generateRecordDetail(int tableId, HashMap data, DataManagerService.OperatorCode opCode){
+    public RecordDetailEntity generateRecordDetail(int tableId, HashMap data, DataManagerService.OperatorCode opCode) throws Exception {
         RecordDetailEntity recordDetail = new RecordDetailEntity();
         recordDetail.setTableId(tableId);
         JSONObject jsonObject = JSONObject.fromObject(data);
