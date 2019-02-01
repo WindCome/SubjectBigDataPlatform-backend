@@ -69,13 +69,14 @@
     </delete>
 
     <select id="findPrimaryKey" statementType="STATEMENT" resultType="String">
-        SELECT column_name FROM INFORMATION_SCHEMA.`KEY_COLUMN_USAGE` WHERE table_name='${tableName}' AND constraint_name='PRIMARY'
+        SELECT column_name FROM INFORMATION_SCHEMA.`KEY_COLUMN_USAGE` WHERE table_name='${tableName}'
+        AND constraint_name='PRIMARY' AND TABLE_SCHEMA = (select database())
     </select>
 
-    <!-- warning!!!! 服务器上不同数据库出现同名表时会出现问题，这里简单采用limit解决，
-            如果不同数据库同名表要查询的字段类型不一致时可能会查到错误的结果-->
     <select id="findColumnType" statementType="STATEMENT" resultType="String">
-        select DATA_TYPE from information_schema.columns where table_name='${tableName}' AND COLUMN_NAME='${columnName}' LIMIT 1;
+        select DATA_TYPE from information_schema.columns where table_name='${tableName}'
+        AND COLUMN_NAME='${columnName}'
+        AND TABLE_SCHEMA = (select database());
     </select>
 
     <select id="countDistinctColumn" statementType="STATEMENT" resultType="long">

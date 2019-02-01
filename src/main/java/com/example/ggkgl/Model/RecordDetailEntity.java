@@ -1,11 +1,8 @@
-package com.example.ggkgl.AssitClass;
+package com.example.ggkgl.Model;
 
 import com.example.ggkgl.Service.DataManagerService;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-import javax.persistence.PrePersist;
+import javax.persistence.*;
 import java.io.Serializable;
 import java.sql.Timestamp;
 
@@ -15,7 +12,7 @@ import java.sql.Timestamp;
 @Entity
 public class RecordDetailEntity implements Serializable{
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /**
@@ -31,6 +28,7 @@ public class RecordDetailEntity implements Serializable{
     /**
      * 操作码
      */
+    @Enumerated(EnumType.STRING)
     private DataManagerService.OperatorCode op;
 
     /**

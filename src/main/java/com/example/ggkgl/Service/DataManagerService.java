@@ -1,14 +1,19 @@
 package com.example.ggkgl.Service;
 
+import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
 import javafx.util.Pair;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import redis.clients.jedis.Jedis;
 
 import javax.annotation.Resource;
 import javax.validation.constraints.NotNull;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -46,20 +51,15 @@ public class DataManagerService {
         Jedis jedis = new Jedis();
         String jsonStr=jedis.get("upgrade"+tableId);
         JSONArray jsonArray= JSONArray.fromObject(jsonStr);
-        for (Object aJsonArray : jsonArray) {
-            JSONObject item = JSONObject.fromObject(aJsonArray);
-            Iterator iterator = item.keys();
-            HashMap<String, Object> itemMap = new HashMap<>();
-            while (iterator.hasNext()) {
-                String key = (String) iterator.next();
-                itemMap.put(key, item.get(key));
-            }
-            result.add(itemMap);
+        for (Object x : jsonArray) {
+            JSONObject item = JSONObject.fromObject(x);
+            result.add(JSONHelper.json2Map(item));
         }
         return new Pair<>(this.redisVersionControlService.getCurrentVersion(tableId),result);
     }
 
     /**
+     * 将数据与mysql数据库中的数据进行对比，字段对比顺序为主键、配置中的matchKey、最后是差异度从大到小的字段
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
      * @param data 要对比的数据Map
      * @return 对比的结果{"oriData":参数中的data,"status":数据对比结果,"data":相关的数据,按匹配程度从大到小排列}
@@ -67,9 +67,11 @@ public class DataManagerService {
     public HashMap<String,Object> contrast(int tableId, @NotNull HashMap data){
         HashMap<String,Object> resultMap=new HashMap<>();
         String tableName = tableConfigService.getTableNameById(tableId);
+        String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
         String[] matchKeys = this.tableConfigService.getMatchKeyField(tableId);
         String[] columnNames = this.sortColumnByDiversityFactor(tableId);
         List<String> matchKeyList = new ArrayList<>(Arrays.asList(matchKeys));
+        matchKeyList.add(0,primaryKey);
         for(String c:columnNames){
             if(!matchKeyList.contains(c)){
                 matchKeyList.add(c);
@@ -216,7 +218,7 @@ public class DataManagerService {
      * @param alterInfo 数据的修改信息
      */
     private void redis2MysqlInsert(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
-        mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.NEW);
+        //mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.NEW);
     }
 
     /**
@@ -226,34 +228,90 @@ public class DataManagerService {
      * @param alterInfo 数据的修改信息
      */
     private void redis2MysqlUpdate(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
-        mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.UPGRADE);
+        //mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.UPGRADE);
     }
 
     /**
-     * 根据一条数据更新mysql数据库
+     * 将数据保存至Mysql数据库
+     * @param tableId mysql表id
+     * @param data 操作的数据列表，每个hashMap格式如下
+     *             {
+     *                  "op":OperatorCode   操作码,
+     *                  "index": Object       主键,
+     *                  "value":{}          新值
+     *             }
+     * @param record  是否记录当前该组操作
+     */
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public void mysqlDataRetention(int tableId,List<HashMap> data,boolean record){
+        for(HashMap x:data){
+            this.mysqlDataRetention(tableId,JSONHelper.jsonStr2Map(x.get("value").toString()),
+                    OperatorCode.valueOf(x.get("op").toString()),record);
+        }
+    }
+
+    private String getExceptionAllInfo(Exception ex) {
+        ByteArrayOutputStream out;
+        PrintStream pout = null;
+        String ret;
+        try {
+            out = new ByteArrayOutputStream();
+            pout = new PrintStream(out);
+            ex.printStackTrace(pout);
+            ret = new String(out.toByteArray());
+            out.close();
+        }
+        catch (Exception e) {
+            return ex.getMessage();
+        }
+        finally {
+            if (pout != null) {
+                pout.close();
+            }
+        }
+        return ret;
+    }
+
+    /**
+     * 单条数据更新至Mysql数据库
      * @param tableId mysql表id
      * @param data 操作的数据
      * @param opCode 操作类型
+     * @param record  是否记录当前操作
+     * @return 旧值，无则为null
      */
     @SuppressWarnings("unchecked")
-    public void mysqlDataRetention(int tableId,HashMap data,OperatorCode opCode){
+    @Transactional
+    public HashMap mysqlDataRetention(int tableId,HashMap data,OperatorCode opCode,boolean record){
+        data.put("MODIFY_TIME",new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()));
         String tableName = this.tableConfigService.getTableNameById(tableId);
-        switch (opCode){
-            case NEW:
-                this.greatMapper.insert(tableName,data);
-                break;
-            case UPGRADE:
-                String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
-                Object id = data.get(primaryKey);
-                if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
-                    id = "'"+id+"'";
-                }
+        String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+        if(opCode == OperatorCode.NEW){
+            if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
+                data.put(primaryKey,UUID.randomUUID().toString());
+            }
+            if(Arrays.asList(this.tableConfigService.getColumnNamesOfTable(tableId)).contains("SEQ_NO")){
+                data.put("SEQ_NO",this.greatMapper.getSize(tableName)+1);
+            }
+            this.greatMapper.insert(tableName,data);
+            return null;
+        }
+        else{
+            Object id = data.get(primaryKey);
+//            if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
+//                id = "'"+id+"'";
+//            }
+            HashMap oldValue = this.greatMapper.freeInspect(tableName,primaryKey,id.toString()).get(0);
+            if(opCode == OperatorCode.UPGRADE){
                 this.greatMapper.update(tableName,id,data);
-                break;
-            case DELETE:
-            case SAME:
-            default:
-                break;
+                return oldValue;
+            }
+            else if(opCode == OperatorCode.DELETE){
+                this.greatMapper.delete(tableName,id.toString());
+                return oldValue;
+            }
+            return null;
         }
     }
 

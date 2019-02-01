@@ -1,6 +1,6 @@
 package com.example.ggkgl.Mapper;
 
-import com.example.ggkgl.AssitClass.RecordEntity;
+import com.example.ggkgl.Model.RecordEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 

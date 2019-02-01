@@ -1,5 +1,7 @@
-package com.example.ggkgl.AssitClass;
+package com.example.ggkgl.Model;
 
+import org.apache.commons.lang.RandomStringUtils;
+import org.hibernate.annotations.GenericGenerator;
 import org.springframework.util.StringUtils;
 
 import javax.persistence.*;
@@ -15,7 +17,8 @@ public class RecordEntity implements Serializable{
      * 操作组ID
      */
     @Id
-    @GeneratedValue
+    @GeneratedValue(generator = "uuid")
+    @GenericGenerator(name = "uuid", strategy = "uuid2")
     private String groupId;
 
     /**
@@ -27,8 +30,14 @@ public class RecordEntity implements Serializable{
      * 数据更新后的版本号
      */
     @Column(unique = true)
-    @GeneratedValue
+    @GeneratedValue(generator = "uuid")
+    @GenericGenerator(name = "uuid", strategy = "uuid2")
     private String currentVersion;
+
+    /**
+     * 该组包含的操作数
+     */
+    private int opCount;
 
     /**
      * 是否生效
@@ -80,8 +89,9 @@ public class RecordEntity implements Serializable{
     }
 
     @PrePersist
-    private void initModifyTime(){
+    private void initFields(){
         this.setModifyTime(new Timestamp(System.currentTimeMillis()));
+        this.setCurrentVersion(System.currentTimeMillis()+ RandomStringUtils.randomAlphanumeric(5));
     }
 
     public boolean isValid() {
@@ -90,5 +100,13 @@ public class RecordEntity implements Serializable{
 
     public void setValid(boolean valid) {
         this.valid = valid;
+    }
+
+    public int getOpCount() {
+        return opCount;
+    }
+
+    public void setOpCount(int opCount) {
+        this.opCount = opCount;
     }
 }

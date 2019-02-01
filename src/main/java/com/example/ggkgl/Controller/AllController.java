@@ -1,7 +1,9 @@
 package com.example.ggkgl.Controller;
 
 import com.example.ggkgl.AssitClass.Change;
+import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
+import com.example.ggkgl.Service.DataManagerService;
 import net.sf.json.JSONObject;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +11,7 @@ import org.springframework.boot.jackson.JsonObjectDeserializer;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.transaction.Transactional;
 import java.io.BufferedReader;
@@ -27,6 +30,9 @@ import java.util.*;
 public class AllController {
     @Autowired
     private GreatMapper greatMapper;
+
+    @Resource
+    private DataManagerService dataManagerService;
 
     /**
      * 获取对应公共库的中文名称
@@ -98,50 +104,13 @@ public class AllController {
 
     /**
      * 统一增加接口
-     * @param tableId
+     * @param tableId  mysql表id
      * @param jsonObject 增加记录需要的json对象，具体格式参照api文档
      * @return  true 成功 false 失败
      */
     @PostMapping(value = "/add/{tableId}")
     public Boolean add(@PathVariable("tableId") int tableId,@RequestBody JSONObject jsonObject) {
-        int flag=getFlag(tableId);
-        List<String> listKeys = new ArrayList<>();
-        List<String> listValues = new ArrayList<>();
-        String tableName = "";
-        try {
-            tableName = getTableName(tableId);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-        Iterator iterator = jsonObject.keys();
-        while (iterator.hasNext()) {
-            String key = (String) iterator.next();
-//            System.out.println(key);
-            listKeys.add(key);
-            listValues.add(jsonObject.getString(key));
-//            System.out.println(jsonObject.getString(key));
-        }
-        if(flag==2) {
-            listKeys.add("ID");
-            listValues.add(UUID.randomUUID().toString());
-            listKeys.add("SEQ_NO");
-            Integer seqNo=getSize(tableId)+1;
-            listValues.add(seqNo.toString());
-        }
-        listKeys.add("MODIFY_TIME");
-        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        listValues.add(df.format(System.currentTimeMillis()));
-        Map<String, Object> params = new HashMap<String, Object>(2);
-        params.put("tableName", tableName);
-        params.put("keys", listKeys);
-        params.put("attributes", listValues);
-        try {
-            //greatMapper.insert(params);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
+        this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(JSONHelper.json2Map(jsonObject)),true);
         return true;
     }
 

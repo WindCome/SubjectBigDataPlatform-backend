@@ -5,11 +5,9 @@ import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Service.DataManagerService;
 import com.example.ggkgl.Service.RedisVersionControlService;
 import com.example.ggkgl.Service.SpiderService;
-import com.example.ggkgl.Service.TableConfigService;
 import javafx.util.Pair;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import net.sf.json.util.JSONTokener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
@@ -35,15 +33,12 @@ public class UpdateController {
 
     private final RedisVersionControlService redisVersionControlService;
 
-    private final TableConfigService tableConfigService;
-
     @Autowired
-    public UpdateController(SpiderService spiderService, AllController allController, DataManagerService dataManagerService, RedisVersionControlService redisVersionControlService, TableConfigService tableConfigService) {
+    public UpdateController(SpiderService spiderService, AllController allController, DataManagerService dataManagerService, RedisVersionControlService redisVersionControlService) {
         this.spiderService = spiderService;
         this.allController = allController;
         this.dataManagerService = dataManagerService;
         this.redisVersionControlService = redisVersionControlService;
-        this.tableConfigService = tableConfigService;
     }
 
     /**
@@ -100,8 +95,6 @@ public class UpdateController {
             }
         }
         JSONObject summerObject=new JSONObject();
-        System.out.println("=====version=====");
-        System.out.println(dataEntry.getKey());
         summerObject.put("version",dataEntry.getKey());
         summerObject.put("totalCount",contrastResult.size());
         summerObject.put("newCount",newCount);
