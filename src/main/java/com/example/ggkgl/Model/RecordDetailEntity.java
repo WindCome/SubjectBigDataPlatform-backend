@@ -26,6 +26,11 @@ public class RecordDetailEntity implements Serializable{
     private String groupId;
 
     /**
+     * 目的对象在所在表中的主键
+     */
+    private String objectId;
+
+    /**
      * 操作码
      */
     @Enumerated(EnumType.STRING)
@@ -118,5 +123,13 @@ public class RecordDetailEntity implements Serializable{
 
     public void setGroupId(String groupId) {
         this.groupId = groupId;
+    }
+
+    public String getObjectId() {
+        return objectId;
+    }
+
+    public void setObjectId(String objectId) {
+        this.objectId = objectId;
     }
 }

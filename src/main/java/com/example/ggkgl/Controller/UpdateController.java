@@ -134,7 +134,7 @@ public class UpdateController {
         else if(status.equals("update"))
         {
             String Id=jsonObject.getString("Id");
-            result= allController.update(tableId,Id,addObject);
+            //result= allController.update(tableId,Id,addObject);
         }
         System.out.println(result);
         if (result)

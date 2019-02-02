@@ -67,29 +67,27 @@ public class MysqlVersionControlService {
     /**
      * 获取最新的版本号
      */
-    public String[] getLatestVersions(){
+    public List<String> getLatestVersions(){
         List<HashMap<String,Object>> history = this.getVersionHistory();
-        int rootIndex = -1;
+        List<Integer> rootIndex = new ArrayList<>();
         for(int i = 0;i<history.size();i++){
             HashMap<String,Object> x = history.get(i);
             @SuppressWarnings("unchecked")
             List<Integer> parentIndexList = (List<Integer>)x.get("parentIndex");
             if(parentIndexList == null || parentIndexList.size() == 0){
-                rootIndex = i;
-                break;
+                rootIndex.add(i);
             }
         }
-        Queue<Integer> queue = new ArrayDeque<>();
-        queue.add(rootIndex);
+        Queue<Integer> queue = new ArrayDeque<>(rootIndex);
         List<Integer> resultIndex = new ArrayList<>();
         while (!queue.isEmpty()){
             int index = queue.poll();
             @SuppressWarnings("unchecked")
             List<Integer> childIndex = (List<Integer>)history.get(index).get("childIndex");
-            if(childIndex == null ||childIndex.size() == 0){
+            if((childIndex == null ||childIndex.size() == 0) && !resultIndex.contains(index)){
                 resultIndex.add(index);
             }
-            else {
+            else if(childIndex != null) {
                 queue.addAll(childIndex);
             }
         }
@@ -98,7 +96,7 @@ public class MysqlVersionControlService {
             RecordEntity record = (RecordEntity)history.get(x).get("record");
             result.add(record.getCurrentVersion());
         }
-        return result.toArray(new String[0]);
+        return result;
     }
 
     /**
@@ -107,11 +105,11 @@ public class MysqlVersionControlService {
      */
     public RecordEntity generateRecord(int opCount) throws Exception {
         RecordEntity groupRecord = new RecordEntity();
-        String[] currentVersions = this.getLatestVersions();
-        if(currentVersions.length>1){
+        List<String> currentVersions = this.getLatestVersions();
+        if(currentVersions.size()>1){
             throw new Exception("需要合并");
         }
-        String version = currentVersions[0];
+        String version = currentVersions.size() == 1?currentVersions.get(0):null;
         groupRecord.setParentVersion(version);
         groupRecord.setOpCount(opCount);
         groupRecord = this.recordRepository.save(groupRecord);
@@ -123,11 +121,16 @@ public class MysqlVersionControlService {
     /**
     * 生成一条数据的更改记录
      */
-    public RecordDetailEntity generateRecordDetail(int tableId, HashMap data, DataManagerService.OperatorCode opCode) throws Exception {
+    public RecordDetailEntity generateRecordDetail(int tableId,Object id, HashMap data, DataManagerService.OperatorCode opCode) throws Exception {
         RecordDetailEntity recordDetail = new RecordDetailEntity();
         recordDetail.setTableId(tableId);
-        JSONObject jsonObject = JSONObject.fromObject(data);
-        recordDetail.setNewValue(jsonObject.toString());
+        if(data!=null){
+            JSONObject jsonObject = JSONObject.fromObject(data);
+            recordDetail.setNewValue(jsonObject.toString());
+        }
+        if(id != null){
+            recordDetail.setObjectId(id.toString());
+        }
         recordDetail.setOp(opCode);
         RecordEntity groupRecord = this.currentGroupRecord.get();
         if(groupRecord == null){
@@ -144,7 +147,8 @@ public class MysqlVersionControlService {
     public void commitRecordDetail(RecordDetailEntity recordDetailEntity){
         recordDetailEntity.setValid(true);
         this.recordDetailRepository.save(recordDetailEntity);
-        if(this.onlyOneOp.get()){
+        Boolean onlyOne = this.onlyOneOp.get();
+        if(onlyOne!=null&&onlyOne){
             this.commitRecord(this.currentGroupRecord.get());
         }
     }

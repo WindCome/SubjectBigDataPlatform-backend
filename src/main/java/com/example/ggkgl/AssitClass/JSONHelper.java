@@ -28,6 +28,9 @@ public class JSONHelper {
     * map转json
      */
     public static String map2Json(Map map){
+        if(map == null){
+            return null;
+        }
         return JSONObject.fromObject(map).toString();
     }
 

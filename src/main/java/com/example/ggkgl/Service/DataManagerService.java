@@ -1,12 +1,15 @@
 package com.example.ggkgl.Service;
 
 import com.example.ggkgl.AssitClass.JSONHelper;
+import com.example.ggkgl.Component.SpringUtil;
 import com.example.ggkgl.Mapper.GreatMapper;
 import javafx.util.Pair;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import redis.clients.jedis.Jedis;
 
 import javax.annotation.Resource;
@@ -22,7 +25,7 @@ import java.util.*;
 @Service
 public class DataManagerService {
     public enum OperatorCode{
-        NEW("new"),UPGRADE("upgrade"),DELETE("delete"),SAME("same");
+        NEW("NEW"),UPDATE("UPDATE"),DELETE("DELETE"),SAME("SAME");
         private String value;
         OperatorCode(String value){
             this.value = value;
@@ -187,7 +190,7 @@ public class DataManagerService {
                 case NEW:
                     this.redis2MysqlInsert(tableId,(HashMap<String,Object>)contrastResult.get("oriData"),alter);
                     break;
-                case UPGRADE:
+                case UPDATE:
                     this.redis2MysqlUpdate(tableId,(HashMap<String,Object>)contrastResult.get("oriData"),alter);
                     break;
                 case DELETE:
@@ -246,7 +249,8 @@ public class DataManagerService {
     @Transactional
     public void mysqlDataRetention(int tableId,List<HashMap> data,boolean record){
         for(HashMap x:data){
-            this.mysqlDataRetention(tableId,JSONHelper.jsonStr2Map(x.get("value").toString()),
+            Object valueField = x.get("value");
+            SpringUtil.getBean(this.getClass()).mysqlDataRetention(tableId,x.get("index"),valueField == null?null:JSONHelper.jsonStr2Map(valueField.toString()),
                     OperatorCode.valueOf(x.get("op").toString()),record);
         }
     }
@@ -261,11 +265,15 @@ public class DataManagerService {
      */
     @SuppressWarnings("unchecked")
     @Transactional
-    public HashMap mysqlDataRetention(int tableId,HashMap data,OperatorCode opCode,boolean record){
-        data.put("MODIFY_TIME",new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()));
-        String tableName = this.tableConfigService.getTableNameById(tableId);
+    public HashMap mysqlDataRetention(int tableId,Object id, HashMap data,OperatorCode opCode,boolean record){
         String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+        if(data!=null){
+            data.put("MODIFY_TIME",new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()));
+            data.remove(primaryKey);
+        }
+        String tableName = this.tableConfigService.getTableNameById(tableId);
         if(opCode == OperatorCode.NEW){
+            Assert.notNull(data,"用于更新的数据不能为空");
             if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
                 data.put(primaryKey,UUID.randomUUID().toString());
             }
@@ -276,12 +284,11 @@ public class DataManagerService {
             return null;
         }
         else{
-            Object id = data.get(primaryKey);
-//            if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
-//                id = "'"+id+"'";
-//            }
+            if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
+                id = "'"+id+"'";
+            }
             HashMap oldValue = this.greatMapper.freeInspect(tableName,primaryKey,id.toString()).get(0);
-            if(opCode == OperatorCode.UPGRADE){
+            if(opCode == OperatorCode.UPDATE){
                 this.greatMapper.update(tableName,id,data);
                 return oldValue;
             }
@@ -310,7 +317,7 @@ public class DataManagerService {
                 return (HashMap<String,Object>)alterInfo.get("newValue");
             case DELETE:
                 return null;
-            case UPGRADE:
+            case UPDATE:
                 HashMap<String,Object> newValue = (HashMap<String,Object>)alterInfo.get("newValue");
                 for(String key:newValue.keySet()){
                     if(data.containsKey(key)){

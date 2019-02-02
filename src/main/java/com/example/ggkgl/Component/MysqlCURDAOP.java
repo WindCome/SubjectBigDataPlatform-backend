@@ -26,15 +26,17 @@ public class MysqlCURDAOP {
     /**
     * 对单条数据操作的AOP环绕
      */
-    @Around(value = "execution(* mysqlDataRetention(..)) &&"+"args(tableId,data,opCode,record)",
-            argNames = "thisJoinPoint,tableId,data,opCode,record")
-    public Object aopPerRecord(ProceedingJoinPoint thisJoinPoint,int tableId,HashMap data,
+    @Around(value = "execution(* mysqlDataRetention(..)) &&"+"args(tableId,id,data,opCode,record)",
+            argNames = "thisJoinPoint,tableId,id,data,opCode,record")
+    public Object aopPerRecord(ProceedingJoinPoint thisJoinPoint,int tableId,Object id,HashMap data,
                              DataManagerService.OperatorCode opCode,boolean record) throws Throwable {
         Object returnValue;
         RecordDetailEntity recordDetail = null;
+        System.out.println("====record======");
+        System.out.println(record);
         //生成记录
         if(record){
-            recordDetail = this.mysqlVersionControlService.generateRecordDetail(tableId,data,opCode);
+            recordDetail = this.mysqlVersionControlService.generateRecordDetail(tableId,id,data,opCode);
         }
         //执行
         returnValue =  thisJoinPoint.proceed();

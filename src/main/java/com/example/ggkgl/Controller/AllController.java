@@ -4,6 +4,7 @@ import com.example.ggkgl.AssitClass.Change;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Service.DataManagerService;
+import com.example.ggkgl.Service.TableConfigService;
 import javafx.util.Pair;
 import net.sf.json.JSONObject;
 import org.apache.ibatis.annotations.Update;
@@ -36,6 +37,8 @@ public class AllController {
 
     @Resource
     private DataManagerService dataManagerService;
+
+    @Resource private TableConfigService tableConfigService;
 
     /**
      * 获取对应公共库的中文名称
@@ -114,9 +117,14 @@ public class AllController {
     @PostMapping(value = "/add/{tableId}")
     public Pair<String,String> add(@PathVariable("tableId") int tableId, @RequestBody JSONObject jsonObject) {
         try{
-            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(JSONHelper.json2Map(jsonObject)),true);
+            HashMap<String,Object> data = new HashMap<>();
+            String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+            data.put("op", DataManagerService.OperatorCode.NEW);
+            data.put("value",jsonObject.toString());
+            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),true);
             return new Pair<>("info",null);
         }catch (Exception e){
+            e.printStackTrace();
             return new Pair<>("info",this.getExceptionAllInfo(e));
         }
     }
@@ -274,76 +282,46 @@ public class AllController {
     /**
      * 统一数据修改接口
      * @param tableId 表的ID（即保存在META_ENTITY中的自增字段）
-     * @param Id 修改数据的Id（即数据库中主键）
+     * @param id 修改数据的Id（即数据库中主键）
      * @param jsonObject 修改json对象（键值对格式），具体参照api文档
      * @return
      */
    @PostMapping(value = "/update/{tableId}")
-    public Boolean update(@PathVariable("tableId") int tableId,@RequestParam(value = "Id") String Id,
+    public Pair<String,String> update(@PathVariable("tableId") int tableId,@RequestParam(value = "Id") String id,
            @RequestBody JSONObject jsonObject)
    {
-       String tableName=getTableName(tableId);
-       int flag=getFlag(tableId);
-       Iterator iterator=jsonObject.keys();
-       List<Change> changeList=new ArrayList<>();
-       while(iterator.hasNext())
-       {
-           Change change=new Change();
-           String key=(String)iterator.next();
-           String value=jsonObject.getString(key);
-           change.setKey(key);
-           change.setValue(value);
-           changeList.add(change);
-       }
-           Change change=new Change();
-           change.setKey("MODIFY_TIME");
-           SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-           change.setValue(df.format(System.currentTimeMillis()));
-           changeList.add(change);
-       Map<String,Object> params=new HashMap<>();
-       params.put("tableName",tableName);
-       if(flag==1)
-       params.put("Id",Id);
-       else params.put("Id","'"+Id+"'");
-       params.put("changeList",changeList);
-       try {
-           //greatMapper.update(params);
-       }
-       catch (Exception e)
-       {
+       try{
+           HashMap<String,Object> data = new HashMap<>();
+           data.put("op", DataManagerService.OperatorCode.UPDATE);
+           data.put("index",id);
+           data.put("value",jsonObject.toString());
+           this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),true);
+           return new Pair<>("info",null);
+       }catch (Exception e){
            e.printStackTrace();
-           return false;
+           return new Pair<>("info",this.getExceptionAllInfo(e));
        }
-       return true;
    }
 
     /**
      * 统一删除接口
-     * @param Id 删除数据的Id
+     * @param id 删除数据的Id
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
      * @return true成功 false失败
      */
     @GetMapping(value = "/delete/{tableId}")
-    public Boolean delete(@RequestParam("Id") String Id,@PathVariable("tableId") int tableId)
+    public Pair<String,String> delete(@RequestParam("Id") String id,@PathVariable("tableId") int tableId)
     {
-        String tableName=getTableName(tableId);
-        int flag=getFlag(tableId);
-        String index;
-        if(flag==1)
-        {
-             index=Id;
-        }
-        else
-            index="'"+Id+"'";
-        try {
-            greatMapper.delete(tableName,index);
-        }
-        catch (Exception e)
-        {
+        try{
+            HashMap<String,Object> data = new HashMap<>();
+            data.put("op", DataManagerService.OperatorCode.DELETE);
+            data.put("index",id);
+            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),true);
+            return new Pair<>("info",null);
+        }catch (Exception e){
             e.printStackTrace();
-            return false;
+            return new Pair<>("info",this.getExceptionAllInfo(e));
         }
-        return true;
     }
 
 }
