@@ -79,11 +79,11 @@ public class MyWebSocket {
             int NO=i+1;
             String status=jsonArray.getJSONObject(i).getString("status");
             if(status.equals("update")||status.equals("new")) {
-                if (!updateController.upgradeSave(i, tableId)) {
-                    session.getBasicRemote().sendObject(-1);
-                    System.out.println(NO);
-                    return ;
-                }
+//                if (!updateController.upgradeSave(i, tableId)) {
+//                    session.getBasicRemote().sendObject(-1);
+//                    System.out.println(NO);
+//                    return ;
+//                }
             }
             System.out.println(NO);
             float process=(float)NO/jsonArray.size();

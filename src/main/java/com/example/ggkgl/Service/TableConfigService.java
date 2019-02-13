@@ -20,6 +20,27 @@ public class TableConfigService {
     private GreatMapper greatMapper;
 
     /**
+     * 获取公共库表的大小（数据条目数）
+     * @param tableId 表的ID（即保存在META_ENTITY中的自增字段）
+     * @return 返回大小
+     */
+    public int getSize(int tableId)
+    {
+        String tableName=this.getTableNameById(tableId);
+        return greatMapper.getSize(tableName);
+    }
+
+    /**
+     * 获取对应公共库的中文名称
+     * @param tableId 表的ID（即保存在META_ENTITY中的自增字段）
+     * @return 返回对应中文名称
+     */
+    public String getChineseName(int tableId)
+    {
+        return greatMapper.freeSearch("META_ENTITY","chinese_name",""+tableId+"");
+    }
+
+    /**
     * 根据id获取表的名称
      */
     public String getTableNameById(int tableId){

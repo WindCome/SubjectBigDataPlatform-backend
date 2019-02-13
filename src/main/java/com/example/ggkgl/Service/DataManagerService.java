@@ -3,19 +3,12 @@ package com.example.ggkgl.Service;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Component.SpringUtil;
 import com.example.ggkgl.Mapper.GreatMapper;
-import javafx.util.Pair;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
-import redis.clients.jedis.Jedis;
 
 import javax.annotation.Resource;
 import javax.validation.constraints.NotNull;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -25,7 +18,7 @@ import java.util.*;
 @Service
 public class DataManagerService {
     public enum OperatorCode{
-        NEW("NEW"),UPDATE("UPDATE"),DELETE("DELETE"),SAME("SAME");
+        NEW("NEW"),UPDATE("UPDATE"),DELETE("DELETE");
         private String value;
         OperatorCode(String value){
             this.value = value;
@@ -40,26 +33,7 @@ public class DataManagerService {
     private GreatMapper greatMapper;
 
     @Resource
-    private RedisVersionControlService redisVersionControlService;
-
-    @Resource
     private TableConfigService tableConfigService;
-
-    /**
-     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
-     * @return {key:版本号,value:数据列表}
-     */
-    public Pair<String,List<HashMap>> getDataFromSpider(int tableId){
-        List<HashMap> result = new ArrayList<>();
-        Jedis jedis = new Jedis();
-        String jsonStr=jedis.get("upgrade"+tableId);
-        JSONArray jsonArray= JSONArray.fromObject(jsonStr);
-        for (Object x : jsonArray) {
-            JSONObject item = JSONObject.fromObject(x);
-            result.add(JSONHelper.json2Map(item));
-        }
-        return new Pair<>(this.redisVersionControlService.getCurrentVersion(tableId),result);
-    }
 
     /**
      * 将数据与mysql数据库中的数据进行对比，字段对比顺序为主键、配置中的matchKey、最后是差异度从大到小的字段
@@ -105,15 +79,8 @@ public class DataManagerService {
                 }
                 return 0;
             });
-            boolean matchFirst = true;
             HashMap first = mainKeyMatchMaps.get(0);
-            for(Object key :data.keySet()){
-                if(!data.get(key).equals(first.get(key))){
-                    matchFirst = false;
-                    break;
-                }
-            }
-            if(matchFirst){
+            if(data.equals(first)){
                 resultMap.put("status","same");
             }
             else {
@@ -122,7 +89,7 @@ public class DataManagerService {
             }
         }
         if(!resultMap.containsKey("data")){
-            resultMap.put("data",new LinkedHashMap<>(0));
+            resultMap.put("data",new ArrayList<>(0));
         }
         resultMap.put("oriData",data);
         return resultMap;
@@ -167,74 +134,6 @@ public class DataManagerService {
     }
 
     /**
-     * @param version  应用变更的mysql数据版本,在aop中使用了该参数
-     * @param tableId   mysql表id
-     * @param indexOfRedisData  redis数据索引
-     * @param alterInfo     修改信息
-     * @return      保存结果详细信息{success:true/false(全部数据插入失败时才为false)
-     *                                 ,details:[{}]}
-     */
-    @SuppressWarnings("unchecked")
-    public HashMap<String,Object> saveData(String version,int tableId, List<Integer> indexOfRedisData, List<HashMap> alterInfo){
-        Pair<String,List<HashMap>> redisData = this.getDataFromSpider(tableId);
-        List<HashMap> data = redisData.getValue();
-        List<HashMap<String,Object>> contrastResults = new ArrayList<>(data.size());
-        for(HashMap x:data){
-            contrastResults.add(this.contrast(tableId,x));
-        }
-        for(int index:indexOfRedisData){
-            HashMap<String,Object> contrastResult = contrastResults.get(index);
-            OperatorCode opCode = OperatorCode.valueOf(contrastResult.get("status").toString());
-            HashMap alter = this.searchMapByKeyAndValue(alterInfo,"index",index);
-            switch (opCode){
-                case NEW:
-                    this.redis2MysqlInsert(tableId,(HashMap<String,Object>)contrastResult.get("oriData"),alter);
-                    break;
-                case UPDATE:
-                    this.redis2MysqlUpdate(tableId,(HashMap<String,Object>)contrastResult.get("oriData"),alter);
-                    break;
-                case DELETE:
-                case SAME:
-                default:
-                    break;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 工具方法，查找列表中键和值相应的字典
-     */
-    private HashMap searchMapByKeyAndValue(List<HashMap> maps,String key,Object value){
-        for(HashMap map:maps){
-            if(map.containsKey(key)&&map.get(key).equals(value)){
-                return map;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 将单条redis数据插入mysql数据库
-     * @param tableId   要插入的mysql表id
-     * @param redisData 参考的redis数据信息
-     * @param alterInfo 数据的修改信息
-     */
-    private void redis2MysqlInsert(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
-        //mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.NEW);
-    }
-
-    /**
-     * 根据单条redis数据更新mysql数据库
-     * @param tableId   要插入的mysql表id
-     * @param redisData 参考的redis数据信息
-     * @param alterInfo 数据的修改信息
-     */
-    private void redis2MysqlUpdate(int tableId,HashMap<String,Object> redisData,HashMap<String,Object> alterInfo){
-        //mysqlDataRetention(tableId,this.alterDataByInfo(redisData,alterInfo),OperatorCode.UPGRADE);
-    }
-
-    /**
      * 将数据保存至Mysql数据库
      * @param tableId mysql表id
      * @param data 操作的数据列表，每个hashMap格式如下
@@ -250,6 +149,7 @@ public class DataManagerService {
     public void mysqlDataRetention(int tableId,List<HashMap> data,boolean record){
         for(HashMap x:data){
             Object valueField = x.get("value");
+            //直接用this调用会导致aop失效
             SpringUtil.getBean(this.getClass()).mysqlDataRetention(tableId,x.get("index"),valueField == null?null:JSONHelper.jsonStr2Map(valueField.toString()),
                     OperatorCode.valueOf(x.get("op").toString()),record);
         }
@@ -260,7 +160,7 @@ public class DataManagerService {
      * @param tableId mysql表id
      * @param data 操作的数据
      * @param opCode 操作类型
-     * @param record  是否记录当前操作
+     * @param record  是否记录当前操作,aop调用
      * @return 旧值，无则为null
      */
     @SuppressWarnings("unchecked")
@@ -284,10 +184,10 @@ public class DataManagerService {
             return null;
         }
         else{
+            HashMap oldValue = this.greatMapper.freeInspect(tableName,primaryKey,id.toString()).get(0);
             if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
                 id = "'"+id+"'";
             }
-            HashMap oldValue = this.greatMapper.freeInspect(tableName,primaryKey,id.toString()).get(0);
             if(opCode == OperatorCode.UPDATE){
                 this.greatMapper.update(tableName,id,data);
                 return oldValue;
@@ -301,33 +201,14 @@ public class DataManagerService {
     }
 
     /**
-     * 根据修改信息对原数据进行修改
-     * @param data 修改的对象
-     * @param alterInfo 修改信息
-     * @return 修改后的对象
+     * 根据主键查找
+     * @param tableId 表id
+     * @param id 要查找对象的主键的值
      */
-    @SuppressWarnings("unchecked")
-    private HashMap<String,Object> alterDataByInfo(HashMap data,HashMap<String,Object> alterInfo){
-        if(alterInfo == null){
-            return data;
-        }
-        OperatorCode opCode = OperatorCode.valueOf(alterInfo.get("op").toString());
-        switch (opCode){
-            case NEW:
-                return (HashMap<String,Object>)alterInfo.get("newValue");
-            case DELETE:
-                return null;
-            case UPDATE:
-                HashMap<String,Object> newValue = (HashMap<String,Object>)alterInfo.get("newValue");
-                for(String key:newValue.keySet()){
-                    if(data.containsKey(key)){
-                        data.put(key,alterInfo.get(key));
-                    }
-                }
-                return data;
-            case SAME:
-            default:
-                return data;
-        }
+    public HashMap findByIdEquals(int tableId,@NotNull Object id){
+        String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+        String tableName = this.tableConfigService.getTableNameById(tableId);
+        List<HashMap> result = this.greatMapper.freeInspect(tableName,primaryKey,id.toString());
+        return result == null ? null : result.get(0);
     }
 }

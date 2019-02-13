@@ -1,10 +1,8 @@
 package com.example.ggkgl.Controller;
 
-import com.csvreader.CsvReader;
+import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
-import com.example.ggkgl.Service.DataManagerService;
-import com.example.ggkgl.Service.RedisVersionControlService;
-import com.example.ggkgl.Service.SpiderService;
+import com.example.ggkgl.Service.*;
 import javafx.util.Pair;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
@@ -13,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
 
 import javax.annotation.Resource;
-import java.nio.charset.Charset;
 import java.util.*;
 
 /**
@@ -27,16 +24,19 @@ public class UpdateController {
 
     private final SpiderService spiderService;
 
-    private final AllController allController;
-
     private final DataManagerService dataManagerService;
 
     private final RedisVersionControlService redisVersionControlService;
 
+    @Resource
+    private TableConfigService tableConfigService;
+
+    @Resource
+    private SpiderDataManagerService spiderDataManagerService;
+
     @Autowired
-    public UpdateController(SpiderService spiderService, AllController allController, DataManagerService dataManagerService, RedisVersionControlService redisVersionControlService) {
+    public UpdateController(SpiderService spiderService, DataManagerService dataManagerService, RedisVersionControlService redisVersionControlService) {
         this.spiderService = spiderService;
-        this.allController = allController;
         this.dataManagerService = dataManagerService;
         this.redisVersionControlService = redisVersionControlService;
     }
@@ -50,18 +50,12 @@ public class UpdateController {
      * @return 返回更新数据列表
      */
     @GetMapping(value = "/upgrade/{tableId}")
+    @SuppressWarnings("unchecked")
     public JSONObject contrast(@PathVariable("tableId") int tableId, @RequestParam("page") int page
             ,@RequestParam("size") int size,@RequestParam(value = "status",defaultValue = "all") String condition)
     {
-        Pair<String,List<HashMap>> dataEntry = this.dataManagerService.getDataFromSpider(tableId);
-        if (dataEntry==null){
-            return null;
-        }
-        List<HashMap> dataList = dataEntry.getValue();
-        List<HashMap<String,Object>> contrastResult =new ArrayList<>(dataList.size());
-        for (HashMap map : dataList) {
-            contrastResult.add(this.dataManagerService.contrast(tableId,map));
-        }
+        String currentVersion = this.redisVersionControlService.getCurrentVersion(tableId);
+        List<HashMap> contrastResult = this.spiderDataManagerService.getContrastResult(tableId);
         int newCount=0;
         int updateCount=0;
         int savedCount=0;
@@ -70,7 +64,7 @@ public class UpdateController {
         JSONArray dataArray = new JSONArray();
         for(int i=0,start=(page-1)*size,counter=0;i<contrastResult.size();i++)
         {
-            HashMap<String,Object> data = contrastResult.get(i);
+            HashMap data = contrastResult.get(i);
             String status=data.get("status").toString();
             if(i>=start&&counter<size) {
                 if(condition.equals("all")||condition.equals(status)) {
@@ -95,7 +89,7 @@ public class UpdateController {
             }
         }
         JSONObject summerObject=new JSONObject();
-        summerObject.put("version",dataEntry.getKey());
+        summerObject.put("version",currentVersion);
         summerObject.put("totalCount",contrastResult.size());
         summerObject.put("newCount",newCount);
         summerObject.put("updateCount",updateCount);
@@ -107,95 +101,31 @@ public class UpdateController {
     }
 
     /**
-     * 保存单条更新数据
-     * @param Index 更新数据的index
+     * 获取指定版本至当前最新版本的下标变化情况
+     * @param tableId mysql表id
+     * @param version 询问的版本
+     */
+    @GetMapping(value = "/version/{version}/index/{tableId}")
+    public List<Pair> getIndexChangeList(@PathVariable("tableId") int tableId,
+                                     @PathVariable(value = "version") String version) {
+        String currentVersion = this.redisVersionControlService.getCurrentVersion(tableId);
+        return this.redisVersionControlService.getIndexChangeDetail(tableId,version,currentVersion);
+    }
+
+    /**
+     * 保存更新数据
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @param jsonArray 修改信息json数组
      * @return  true成功 false失败
      */
-    @GetMapping(value = "/upgradeSave/{tableId}")
-    public  Boolean upgradeSave(@RequestParam("index") int Index,@PathVariable("tableId") int tableId)
+    @PostMapping(value = "/redis/modify/{tableId}")
+    public Boolean modifyData(@PathVariable("tableId") int tableId,@RequestBody JSONArray jsonArray)
     {
-        Jedis jedis=new Jedis();
-        String jsonStr=jedis.get("upgrade"+tableId);
-        JSONArray jsonArray=JSONArray.fromObject(jsonStr);
-        JSONObject jsonObject=jsonArray.getJSONObject(Index);
-        String status=jsonObject.getString("status");
-        jsonObject.put("status","saved");
-        JSONObject dataObject=jsonObject.getJSONObject("data");
-        JSONObject addObject=new JSONObject();
-        for (Object key: dataObject.keySet().toArray())
-        {
-            addObject.put(key,dataObject.getJSONObject(key.toString()).getString("newValue"));
+        List<HashMap> modifyList = new ArrayList<>(jsonArray.size());
+        for(int i = 0;i<jsonArray.size();i++){
+            modifyList.add(JSONHelper.jsonStr2Map(jsonArray.getString(i)));
         }
-        Boolean result=false;
-        if(status.equals("new")) {
-            //result = allController.add(tableId, addObject);
-        }
-        else if(status.equals("update"))
-        {
-            String Id=jsonObject.getString("Id");
-            //result= allController.update(tableId,Id,addObject);
-        }
-        System.out.println(result);
-        if (result)
-        {
-            jedis.set("upgrade"+tableId,jsonArray.toString());
-        }
-        return result;
-    }
-
-    /**
-     * 修改某条更新数据
-     * @param Index 更新数据index
-     * @param tableId  表的Id（即保存在META_ENTITY中的自增字段）
-     * @param changes  更新数据json具体格式样例见api文档
-     * @return true成功 false失败
-     */
-    @PostMapping(value = "/upgrade/modify/{tableId}")
-    public Boolean modify(@RequestParam("index") int Index,@PathVariable("tableId") int tableId,
-                       @RequestBody JSONObject changes)
-    {
-        Jedis jedis=new Jedis();
-        String jsonStr=jedis.get("upgrade"+tableId);
-        JSONArray jsonArray=JSONArray.fromObject(jsonStr);
-        JSONObject jsonObject=jsonArray.getJSONObject(Index);
-        JSONObject dataObject=jsonObject.getJSONObject("data");
-        for (Object key:changes.keySet())
-        {
-            try {
-                JSONObject columnObject = dataObject.getJSONObject(key.toString());
-                columnObject.put("newValue", changes.get(key));
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
-                return false;
-            }
-        }
-        jedis.set("upgrade"+tableId,jsonArray.toString());
-        return true;
-    }
-
-    /**
-     * 删除某条更新数据
-     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
-     * @param index 更新数据的index
-     * @return true成功，false失败
-     */
-    @GetMapping(value = "/upgrade/delete/{tableId}")
-    public Boolean delete(@PathVariable("tableId")int tableId,@RequestParam("index")int index)
-    {
-        Jedis jedis=new Jedis();
-        String jsonStr=jedis.get("upgrade"+tableId);
-        JSONArray jsonArray=JSONArray.fromObject(jsonStr);
-        try {
-            jsonArray.remove(index);
-        }catch (Exception e)
-        {
-            e.printStackTrace();
-            return false;
-        }
-        jedis.set("upgrade"+tableId,jsonArray.toString());
+        this.spiderDataManagerService.modifySpiderData(tableId,modifyList);
         return true;
     }
 
@@ -207,22 +137,25 @@ public class UpdateController {
     @GetMapping(value = "/generateUpgrade/{tableId}")
     public long generate(@PathVariable("tableId") int tableId)
     {
-        String tableName= allController.getTableName(tableId);
+        String tableName= this.tableConfigService.getTableNameById(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
         JSONObject upgradeJson = allJson.getJSONObject("upgrade");
         JSONObject command=upgradeJson.getJSONObject("command");
         return this.spiderService.execCrawl(null, command.getString("value"),
                 new SpiderService.CrawlCallBack(){
             private String dataDump = null;
-            private Jedis jedis = new Jedis();
             @Override
             public void onStart() {
-                this.dataDump = jedis.get("upgrade"+tableId);
+                this.dataDump = UpdateController.this.spiderDataManagerService.getJsonDataFromSpider(tableId);
             }
             @Override
             public void onFinished() {
-                UpdateController.this.redisVersionControlService.contrast(
-                        tableId,dataDump,jedis.get("upgrade"+tableId));
+                String oldVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(tableId);
+                UpdateController.this.redisVersionControlService.contrast(tableId,dataDump,
+                        UpdateController.this.spiderDataManagerService.getJsonDataFromSpider(tableId));
+                String currentVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(tableId);
+                List<Pair> changeList = UpdateController.this.redisVersionControlService.getIndexChangeDetail(tableId,oldVersion,currentVersion);
+                UpdateController.this.spiderDataManagerService.resetIndex(tableId, changeList);
             }
         });
     }
@@ -235,106 +168,6 @@ public class UpdateController {
     @GetMapping(value = "/generateUpgrade/result/{tid}")
     public Boolean isDataAvailable(@PathVariable("tid") int tid){
         return this.spiderService.isSpiderCrawlFinish(tid);
-    }
-
-    /**
-     * 转换读取csv得到的数据map为最后需要的对比后的更新数据map，此方法目前仅被generate调用
-     * @param tableName 表名
-     * @param map  读取csv得到的map
-     * @param year  更新数据的年份
-     * @param status  对比后的状态
-     * @param index 数据的主键
-     * @param sign  对应公共库表的类型
-     * @return 返回更新数据map
-     */
-    public HashMap convertMap(String tableName,HashMap map,String year,String status,String index,int sign)
-    {
-        HashMap resultMap=new HashMap();
-        Boolean flag=true;
-        HashMap dataMap=new HashMap();
-        String fakeIndex="'"+index+"'";
-        for (Object key : map.keySet()) {
-            HashMap columnMap = new HashMap();
-            String newValue=map.get(key).toString();
-            columnMap.put("newValue",newValue == null?"":newValue);
-            if(status.equals("update")) {
-                String oldValue=greatMapper.freeSearch(tableName,key.toString(),fakeIndex);
-                columnMap.put("oldValue",oldValue == null?"":oldValue);
-                if(newValue.equals(oldValue))
-                    columnMap.put("status","same");
-                else {
-                    columnMap.put("status", "update");
-                    flag=false;
-                }
-            }
-            else {
-                columnMap.put("oldValue", "");
-                columnMap.put("status","");
-                flag=false;
-            }
-            dataMap.put(key,columnMap);
-        }
-        if(sign==2) {
-            HashMap yearMap = new HashMap();
-            yearMap.put("newValue", year);
-            if (status.equals("update")) {
-                String oldYear = greatMapper.freeSearch(tableName, "PDSJ", fakeIndex);
-                yearMap.put("oldValue", oldYear==null?"":oldYear);
-                if (oldYear!=null && oldYear.equals(year)) {
-                    yearMap.put("status", "same");
-                } else {
-                    yearMap.put("status", "update");
-                    flag = false;
-                }
-            } else {
-                yearMap.put("oldValue", "");
-                yearMap.put("status", "");
-            }
-            dataMap.put("PDSJ", yearMap);
-        }
-        resultMap.put("Id",index);
-        resultMap.put("data",dataMap);
-        if(flag)
-            resultMap.put("status","same");
-        else
-            resultMap.put("status",status);
-        return resultMap;
-    }
-
-    /**
-     * 工具类，用于读取csv转换成hashmap
-     * @param pathName csv相对路径
-     * @return  返回转换后的map
-     */
-    public List<HashMap> csvToHashMap(String pathName)
-    {
-        List<HashMap> maps=new ArrayList<>();
-        try
-        {
-            CsvReader csvReader=new CsvReader(pathName,',',Charset.forName("utf-8"));
-            csvReader.readRecord();
-            String[] titles=csvReader.getValues();
-//            for (String title: titles
-//                 ) {
-//                System.out.println(title);
-//            }
-            while(csvReader.readRecord())
-            {
-                HashMap map=new HashMap();
-                String[] columns=csvReader.getValues();
-                for(int i=0;i<titles.length;i++)
-                {
-                    map.put(titles[i],columns[i]);
-                }
-                maps.add(map);
-            }
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-            return null;
-        }
-        return maps;
     }
 
     /**
