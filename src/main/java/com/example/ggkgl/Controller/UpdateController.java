@@ -8,7 +8,6 @@ import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import redis.clients.jedis.Jedis;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -24,9 +23,10 @@ public class UpdateController {
 
     private final SpiderService spiderService;
 
-    private final DataManagerService dataManagerService;
-
     private final RedisVersionControlService redisVersionControlService;
+
+    @Resource
+    private DataManagerService dataManagerService;
 
     @Resource
     private TableConfigService tableConfigService;
@@ -35,9 +35,8 @@ public class UpdateController {
     private SpiderDataManagerService spiderDataManagerService;
 
     @Autowired
-    public UpdateController(SpiderService spiderService, DataManagerService dataManagerService, RedisVersionControlService redisVersionControlService) {
+    public UpdateController(SpiderService spiderService, RedisVersionControlService redisVersionControlService) {
         this.spiderService = spiderService;
-        this.dataManagerService = dataManagerService;
         this.redisVersionControlService = redisVersionControlService;
     }
 
@@ -54,50 +53,9 @@ public class UpdateController {
     public JSONObject contrast(@PathVariable("tableId") int tableId, @RequestParam("page") int page
             ,@RequestParam("size") int size,@RequestParam(value = "status",defaultValue = "all") String condition)
     {
-        String currentVersion = this.redisVersionControlService.getCurrentVersion(tableId);
-        List<HashMap> contrastResult = this.spiderDataManagerService.getContrastResult(tableId);
-        int newCount=0;
-        int updateCount=0;
-        int savedCount=0;
-        int sameCount=0;
-        JSONObject showObject = new JSONObject();
-        JSONArray dataArray = new JSONArray();
-        for(int i=0,start=(page-1)*size,counter=0;i<contrastResult.size();i++)
-        {
-            HashMap data = contrastResult.get(i);
-            String status=data.get("status").toString();
-            if(i>=start&&counter<size) {
-                if(condition.equals("all")||condition.equals(status)) {
-                   data.put("index",i);
-                   dataArray.add(data);
-                   counter++;
-                }
-            }
-            switch (status) {
-                case "new":
-                    newCount++;
-                    break;
-                case "update":
-                    updateCount++;
-                    break;
-                case "saved":
-                    savedCount++;
-                    break;
-                case "same":
-                    sameCount++;
-                    break;
-            }
-        }
-        JSONObject summerObject=new JSONObject();
-        summerObject.put("version",currentVersion);
-        summerObject.put("totalCount",contrastResult.size());
-        summerObject.put("newCount",newCount);
-        summerObject.put("updateCount",updateCount);
-        summerObject.put("savedCount",savedCount);
-        summerObject.put("sameCount",sameCount);
-        showObject.put("summer",summerObject);
-        showObject.put("detail",dataArray);
-        return showObject;
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("status",condition);
+        return this.searchUpgrade(jsonObject,tableId,page,size);
     }
 
     /**
@@ -119,13 +77,37 @@ public class UpdateController {
      * @return  true成功 false失败
      */
     @PostMapping(value = "/redis/modify/{tableId}")
+    @SuppressWarnings("unchecked")
     public Boolean modifyData(@PathVariable("tableId") int tableId,@RequestBody JSONArray jsonArray)
     {
         List<HashMap> modifyList = new ArrayList<>(jsonArray.size());
         for(int i = 0;i<jsonArray.size();i++){
             modifyList.add(JSONHelper.jsonStr2Map(jsonArray.getString(i)));
         }
-        this.spiderDataManagerService.modifySpiderData(tableId,modifyList);
+        Set<Integer> indexSet = this.spiderDataManagerService.recordModifySpiderData(tableId,modifyList);
+        String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+        List<HashMap> data = new ArrayList<>(indexSet.size());
+        for(int i : indexSet){
+            HashMap map = this.spiderDataManagerService.getDataFromSpiderAfterModifying(tableId,null,i);
+            HashMap<String,Object> contrastResult = this.dataManagerService.contrast(tableId,map);
+            String status = contrastResult.get("status").toString();
+            HashMap<String,Object> opMap = new HashMap<>(3);
+            if(status.equals("new")){
+                opMap.put("op", DataManagerService.OperatorCode.NEW);
+            }else if(status.equals("update")){
+                List<HashMap> similarData = (List<HashMap>)contrastResult.get("data");
+                if (similarData.size() == 0){
+                    System.out.println("标志为更新的数据项没有更新目标");
+                    continue;
+                }
+                HashMap targetData = similarData.get(0);
+                opMap.put("op", DataManagerService.OperatorCode.DELETE);
+                opMap.put("index",targetData.get(primaryKey));
+                opMap.put("value",map);
+            }
+            data.add(opMap);
+        }
+        dataManagerService.mysqlDataRetention(tableId,data,true);
         return true;
     }
 
@@ -179,74 +161,47 @@ public class UpdateController {
      * @return 返回搜索结构列表
      */
     @PostMapping(value = "/searchUpgrade/{tableId}")
-    public JSONArray searchUpgrade(@RequestBody JSONObject jsonObject,@PathVariable("tableId")int tableId,
-                                   @RequestParam(value = "page",defaultValue = "-1") int page,
-                                   @RequestParam(value = "size",defaultValue = "-1") int size)
+    @SuppressWarnings("unchecked")
+    public JSONObject searchUpgrade(@RequestBody JSONObject jsonObject,@PathVariable("tableId")int tableId,
+                                   @RequestParam(value = "page",defaultValue = "0") int page,
+                                   @RequestParam(value = "size",defaultValue = "20") int size)
     {
-        Jedis jedis=new Jedis();
-        String jsonstr=jedis.get("upgrade"+tableId);
-        JSONArray upgradeJson=JSONArray.fromObject(jsonstr);
-        JSONArray resultArray=new JSONArray();
-        int savedCount=0;
+        HashMap<String,Object> filter = new HashMap<>();
+        filter.put("page",page);
+        filter.put("size",size);
+        for(Object key : jsonObject.keySet()){
+            filter.put(key.toString(),jsonObject.get(key));
+        }
+        String currentVersion = this.redisVersionControlService.getCurrentVersion(tableId);
+        HashMap contrastResult = this.spiderDataManagerService.getContrastResult(tableId, filter);
+        List<HashMap> list = (List<HashMap>)contrastResult.get("result");
         int updateCount=0;
         int newCount=0;
         int sameCount=0;
-        for(int i=0;i<upgradeJson.size();i++)
-        {
-            JSONObject item=upgradeJson.getJSONObject(i);
-            JSONObject dataObject=item.getJSONObject("data");
-            String status=item.getString("status");
-            Boolean isMatch=true;
-            JSONObject condition=jsonObject.getJSONObject("condition");
-            JSONObject statusObject=jsonObject.getJSONObject("status");
-            if (statusObject.getString(status).equals("false"))
-                isMatch=false;
-            for(Object key:condition.keySet())
-            {
-                String value1=dataObject.getJSONObject(key.toString()).getString("newValue");
-                String value2=condition.get(key).toString();
-//                System.out.println(value1);
-//                System.out.println(value2);
-                if(!value1.contains(value2))
-                {
-                    System.out.println("!");
-                    isMatch=false;
-                    break;
-                }
-            }
-            if(isMatch) {
-                if(status.equals("new"))
+        for (HashMap map : list) {
+            String status = map.get("status").toString();
+            switch (status) {
+                case "new":
                     newCount++;
-                else if (status.equals("update"))
+                    break;
+                case "update":
                     updateCount++;
-                else if(status.equals("saved"))
-                    savedCount++;
-                else if (status.equals("same"))
+                    break;
+                case "same":
                     sameCount++;
-                item.put("index",i);
-                resultArray.add(item);
+                    break;
             }
         }
-        JSONObject total=new JSONObject();
-        total.put("totalCount",resultArray.size());
-        total.put("newCount",newCount);
-        total.put("updateCount",updateCount);
-        total.put("savedCount",savedCount);
-        total.put("sameCount",sameCount);
-        if(page==-1||size==-1)
-        {
-            resultArray.add(total);
-            return resultArray;
-        }
-        JSONArray returnArray=new JSONArray();
-        int start=(page-1)*size;
-        int end=start+size;
-        for(int i=start;i<resultArray.size()&&i<end;i++)
-        {
-            returnArray.add(resultArray.getJSONObject(i));
-        }
-        returnArray.add(total);
-        return returnArray;
+        JSONObject summer=new JSONObject();
+        summer.put("version",currentVersion);
+        summer.put("totalCount",contrastResult.get("totalCount"));
+        summer.put("newCount",newCount);
+        summer.put("updateCount",updateCount);
+        summer.put("sameCount",sameCount);
+        JSONObject result = new JSONObject();
+        result.put("summer",summer);
+        result.put("detail",list);
+        return result;
     }
 
 
