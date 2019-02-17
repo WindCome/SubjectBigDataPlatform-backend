@@ -44,26 +44,46 @@ public class SpiderDataManagerService {
     /**
     *获取原始爬虫数据
      */
-    public String getJsonDataFromSpider(int tableId){
+    public List<String> getJsonDataFromSpider(int tableId){
+        String key = "upgrade"+tableId;
         Jedis jedis = new Jedis();
-        return jedis.get("upgrade"+tableId);
+        long size = jedis.llen(key);
+        List<String> result = new ArrayList<>((int)size);
+        for(long i =0; i < size; i++){
+            result.add(jedis.lindex(key,i));
+        }
+        return result;
     }
 
     /**
     * 获取原始爬虫数据列表
      */
     public List<HashMap> getDataListFromSpider(int tableId){
-        return JSONHelper.jsonStr2MapList(this.getJsonDataFromSpider(tableId));
+        List<String> jsonData = this.getJsonDataFromSpider(tableId);
+        List<HashMap> result = new ArrayList<>(jsonData.size());
+        for(String x : jsonData){
+            result.add(JSONHelper.jsonStr2Map(x));
+        }
+        return result;
+    }
+
+    public List<HashMap> getContrastResult(int tableId){
+        return this.getContrastResult(tableId,null,null);
     }
 
     /**
     * 获取爬虫数据和mysql数据库的对比结果，注意：使用的爬虫数据是经过更改记录修改的
      */
     @SuppressWarnings("unchecked")
-    public List<HashMap> getContrastResult(int tableId){
+    public List<HashMap> getContrastResult(int tableId,Integer page,Integer size){
         List<HashMap> spiderData = this.getDataListFromSpider(tableId);
         List<HashMap> result = new ArrayList<>(spiderData.size());
-        for (int i = 0;i<spiderData.size();i++){
+        int startIndex = 0;
+        int counter = spiderData.size();
+        if(page != null && size != null){
+            startIndex = page * size;
+        }
+        for (int i = startIndex;i<counter;i++){
             HashMap map = spiderData.get(i);
             SpiderDataChangeEntity spiderDataChangeEntity =
                     this.spiderDataChangeRepository.findByTableIdEqualsAndIndexEquals(tableId, i);

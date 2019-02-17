@@ -4,6 +4,7 @@ import com.example.ggkgl.Mapper.GreatMapper;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import net.sf.json.util.JSONTokener;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -35,6 +36,7 @@ public class TableConfigService {
      * @param tableId 表的ID（即保存在META_ENTITY中的自增字段）
      * @return 返回对应中文名称
      */
+    @Cacheable(value = "tableConfigService", key="#tableId + 'getChineseName'")
     public String getChineseName(int tableId)
     {
         return greatMapper.freeSearch("META_ENTITY","chinese_name",""+tableId+"");
@@ -43,6 +45,7 @@ public class TableConfigService {
     /**
     * 根据id获取表的名称
      */
+    @Cacheable(value = "tableConfigService", key="#tableId + 'getTableNameById'")
     public String getTableNameById(int tableId){
         return greatMapper.freeSearch("META_ENTITY","name",String.valueOf(tableId));
     }
@@ -50,6 +53,7 @@ public class TableConfigService {
     /**
      * 获取表的主键
      */
+    @Cacheable(value = "tableConfigService", key="#tableId + 'getPrimaryKeyByTableId'")
     public String getPrimaryKeyByTableId(int tableId){
         String tableName = this.getTableNameById(tableId);
         return this.greatMapper.findPrimaryKey(tableName);
@@ -58,6 +62,7 @@ public class TableConfigService {
     /**
     * 获取表的所有字段名
      */
+    @Cacheable(value = "tableConfigService", key="#tableId + 'getColumnNamesOfTable'")
     public String[] getColumnNamesOfTable(int tableId){
         String[] columnNames = this.greatMapper.findColumnName(this.getTableNameById(tableId));
         if(columnNames == null ){
@@ -69,10 +74,14 @@ public class TableConfigService {
     /**
      * 获取META_DATA中对应表的matchKeys配置
      */
+    @Cacheable(value = "tableConfigService", key="#tableId + 'MatchKeyField'")
     public String[] getMatchKeyField(int tableId){
         String tableName = this.getTableNameById(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
         JSONObject configJson=allJson.getJSONObject("config");
+        if(!configJson.has("matchKeys")){
+            return new String[0];
+        }
         Object matchKeysConfig = new JSONTokener(configJson.getString("matchKeys")).nextValue();
         List<String> matchKeyList = new ArrayList<>();
         if(matchKeysConfig instanceof JSONArray){
@@ -101,9 +110,18 @@ public class TableConfigService {
     /**
     * 查询mysql字段数据类型
      */
+    @Cacheable(value = "tableConfigService", key="#tableId + #columnName + 'ColumnType'")
     public Class getColumnType(int tableId,String columnName){
         String tableName = this.getTableNameById(tableId);
         String typeName = this.greatMapper.findColumnType(tableName,columnName);
         return TableConfigService.mysql2JavaDataType.get(typeName.toLowerCase());
+    }
+
+    /**
+    * 查询某个字段不重复记录的数量
+     */
+    @Cacheable(value = "tableConfigService", key="#tableName + #columnName + 'ColumnType'")
+    public long countDistinctColumn(String tableName,String columnName){
+        return this.greatMapper.countDistinctColumn(tableName,columnName);
     }
 }

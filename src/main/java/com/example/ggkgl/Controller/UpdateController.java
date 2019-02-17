@@ -143,7 +143,7 @@ public class UpdateController {
         JSONObject command=upgradeJson.getJSONObject("command");
         return this.spiderService.execCrawl(null, command.getString("value"),
                 new SpiderService.CrawlCallBack(){
-            private String dataDump = null;
+            private Object dataDump = null;
             @Override
             public void onStart() {
                 this.dataDump = UpdateController.this.spiderDataManagerService.getJsonDataFromSpider(tableId);

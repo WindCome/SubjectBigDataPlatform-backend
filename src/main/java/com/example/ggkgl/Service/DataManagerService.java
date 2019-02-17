@@ -6,6 +6,7 @@ import com.example.ggkgl.Mapper.GreatMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import javax.validation.constraints.NotNull;
@@ -68,8 +69,11 @@ public class DataManagerService {
             mainKeyMatchMaps.sort((o1, o2) -> {
                 for(String key : matchKeyList){
                     Object targetValue = data.get(key);
-                    boolean o1Match = o1.get(key).equals(targetValue);
-                    boolean o2Match = o2.get(key).equals(targetValue);
+                    if(targetValue == null){
+                        continue;
+                    }
+                    boolean o1Match = targetValue.equals(o1.get(key));
+                    boolean o2Match = targetValue.equals(o2.get(key));
                     if(o2Match && !o1Match){
                         return 1;
                     }
@@ -79,8 +83,15 @@ public class DataManagerService {
                 }
                 return 0;
             });
+            boolean matchFirst = true;
             HashMap first = mainKeyMatchMaps.get(0);
-            if(data.equals(first)){
+            for(Object key :data.keySet()){
+                if(!data.get(key).equals(first.get(key))){
+                    matchFirst = false;
+                    break;
+                }
+            }
+            if(matchFirst){
                 resultMap.put("status","same");
             }
             else {
@@ -103,13 +114,13 @@ public class DataManagerService {
     private String[] sortColumnByDiversityFactor(int tableId){
         String tableName = tableConfigService.getTableNameById(tableId);
         String[] columnNames = this.tableConfigService.getColumnNamesOfTable(tableId);
-        int sizeOfTable = this.greatMapper.getSize(tableName);
+        int sizeOfTable = this.tableConfigService.getSize(tableId);
         if(sizeOfTable == 0 || columnNames.length == 0){
             return columnNames;
         }
         Map<String,Float> columnToDiversityFactorMap = new HashMap<>(columnNames.length);
         for(String c:columnNames){
-            float factor = this.greatMapper.countDistinctColumn(tableName,c)/sizeOfTable;
+            float factor = this.tableConfigService.countDistinctColumn(tableName,c)/sizeOfTable;
             columnToDiversityFactorMap.put(c,factor);
         }
         columnToDiversityFactorMap = this.sortMapByValue(columnToDiversityFactorMap);
