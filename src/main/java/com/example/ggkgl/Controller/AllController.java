@@ -1,6 +1,7 @@
 package com.example.ggkgl.Controller;
 
 import com.example.ggkgl.AssitClass.Change;
+import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Service.DataManagerService;
 import com.example.ggkgl.Service.TableConfigService;
@@ -53,7 +54,7 @@ public class AllController {
             HashMap<String,Object> data = new HashMap<>();
             data.put("op", DataManagerService.OperatorCode.NEW);
             data.put("value",jsonObject.toString());
-            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),true);
+            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
             return null;
         }catch (Exception e){
             e.printStackTrace();
@@ -74,7 +75,7 @@ public class AllController {
             HashMap<String,Object> data = new HashMap<>();
             data.put("op", DataManagerService.OperatorCode.DELETE);
             data.put("index",id);
-            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),true);
+            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
             return null;
         }catch (Exception e){
             e.printStackTrace();
@@ -98,7 +99,7 @@ public class AllController {
             data.put("op", DataManagerService.OperatorCode.UPDATE);
             data.put("index",id);
             data.put("value",jsonObject.toString());
-            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),true);
+            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
             return null;
         }catch (Exception e){
             e.printStackTrace();
@@ -146,6 +147,12 @@ public class AllController {
         for(Object key:jsonObject.keySet()){
             map.put(key.toString(),jsonObject.get(key).toString());
         }
+        String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+        boolean isDigit = this.tableConfigService.getColumnType(tableId, primaryKey) != String.class;
+        HashMap<String,Object> index = new HashMap<>(2);
+        index.put("name",primaryKey);
+        index.put("isDigit",isDigit);
+        map.put("index", JSONHelper.map2Json(index));
         return map;
     }
 

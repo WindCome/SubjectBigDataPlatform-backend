@@ -1,6 +1,7 @@
 package com.example.ggkgl.Controller;
 
 import com.example.ggkgl.AssitClass.JSONHelper;
+import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Service.*;
 import javafx.util.Pair;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 包含所有更新相关的接口和搜索接口
@@ -71,25 +74,52 @@ public class UpdateController {
     }
 
     /**
-     * 保存更新数据
+     * 修改爬虫数据
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
      * @param jsonArray 修改信息json数组
-     * @return  true成功 false失败
+     * @return  修改成功的下标数组
      */
     @PostMapping(value = "/redis/modify/{tableId}")
     @SuppressWarnings("unchecked")
-    public Boolean modifyData(@PathVariable("tableId") int tableId,@RequestBody JSONArray jsonArray)
+    public Set<Integer> modifyData(@PathVariable("tableId") int tableId,@RequestBody JSONArray jsonArray)
     {
         List<HashMap> modifyList = new ArrayList<>(jsonArray.size());
         for(int i = 0;i<jsonArray.size();i++){
             modifyList.add(JSONHelper.jsonStr2Map(jsonArray.getString(i)));
         }
-        Set<Integer> indexSet = this.spiderDataManagerService.recordModifySpiderData(tableId,modifyList);
+        return this.spiderDataManagerService.recordModifySpiderData(tableId,modifyList);
+    }
+
+    /**
+     * 保存单条爬虫数据
+     * @param tableId mysql表id
+     * @param index 爬虫数据下标
+     * @return  true成功 false失败
+     */
+    @PutMapping(value = "/redis/save/{tableId}")
+    @SuppressWarnings("unchecked")
+    public boolean saveRedisData(@PathVariable("tableId") int tableId,@RequestParam("index") int index){
+        return this.saveRedisData(tableId,Collections.singletonList(index),null);
+    }
+
+    /**
+     * 保存爬虫数据
+     * @param tableId mysql表id
+     * @param indexList 爬虫数据下标数组,null或者大小为0时保存全部
+     * @return  true成功 false失败
+     */
+    @PostMapping(value = "/redis/save/{tableId}")
+    @SuppressWarnings("unchecked")
+    public boolean saveRedisData(@PathVariable("tableId") int tableId,@RequestBody List<Integer> indexList,ProcessCallBack processCallBack)
+    {
+        if(indexList == null){
+            int size = this.spiderDataManagerService.getSizeOfData(tableId);
+            indexList = IntStream.iterate(0, n -> n + 1).limit(size).boxed().collect(Collectors.toList());
+        }
         String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
-        List<HashMap> data = new ArrayList<>(indexSet.size());
-        for(int i : indexSet){
-            HashMap map = this.spiderDataManagerService.getDataFromSpiderAfterModifying(tableId,null,i);
-            HashMap<String,Object> contrastResult = this.dataManagerService.contrast(tableId,map);
+        List<HashMap> data = new ArrayList<>(indexList.size());
+        for(int i : indexList){
+            HashMap<String,Object> contrastResult = this.spiderDataManagerService.getContrastResult(tableId,i);
             String status = contrastResult.get("status").toString();
             HashMap<String,Object> opMap = new HashMap<>(3);
             if(status.equals("new")){
@@ -103,11 +133,11 @@ public class UpdateController {
                 HashMap targetData = similarData.get(0);
                 opMap.put("op", DataManagerService.OperatorCode.DELETE);
                 opMap.put("index",targetData.get(primaryKey));
-                opMap.put("value",map);
             }
+            opMap.put("value",contrastResult.get("oriData"));
             data.add(opMap);
         }
-        dataManagerService.mysqlDataRetention(tableId,data,true);
+        dataManagerService.mysqlDataRetention(tableId,data,processCallBack,true);
         return true;
     }
 
@@ -163,11 +193,11 @@ public class UpdateController {
     @PostMapping(value = "/searchUpgrade/{tableId}")
     @SuppressWarnings("unchecked")
     public JSONObject searchUpgrade(@RequestBody JSONObject jsonObject,@PathVariable("tableId")int tableId,
-                                   @RequestParam(value = "page",defaultValue = "0") int page,
+                                   @RequestParam(value = "page",defaultValue = "1") int page,
                                    @RequestParam(value = "size",defaultValue = "20") int size)
     {
         HashMap<String,Object> filter = new HashMap<>();
-        filter.put("page",page);
+        filter.put("page",page-1);
         filter.put("size",size);
         for(Object key : jsonObject.keySet()){
             filter.put(key.toString(),jsonObject.get(key));

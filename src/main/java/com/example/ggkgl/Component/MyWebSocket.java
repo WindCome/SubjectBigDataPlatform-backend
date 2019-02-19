@@ -1,20 +1,19 @@
 package com.example.ggkgl.Component;
 
+import com.example.ggkgl.AssitClass.JSONHelper;
+import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Controller.UpdateController;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RestController;
-import redis.clients.jedis.Jedis;
-
 import javax.websocket.*;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -24,18 +23,17 @@ import java.util.concurrent.CopyOnWriteArraySet;
 @Component
 public class MyWebSocket {
     //静态变量，用来记录当前在线连接数。应该把它设计成线程安全的。
-    private static int onlineCount = 0;
+    private static AtomicInteger onlineCount = new AtomicInteger(0);
 
     //concurrent包的线程安全Set，用来存放每个客户端对应的MyWebSocket对象。
-    private static CopyOnWriteArraySet<MyWebSocket> webSocketSet = new CopyOnWriteArraySet<MyWebSocket>();
+    private static CopyOnWriteArraySet<MyWebSocket> webSocketSet = new CopyOnWriteArraySet<>();
 
     //与某个客户端的连接会话，需要通过它来给客户端发送数据
     private Session session;
-    private int tableId;
-    private static ApplicationContext applicationContext;
-    private UpdateController updateController;
-    private String status="false";
 
+    private int tableId;
+
+    private static UpdateController updateController;
 
     /**
      * 连接建立成功调用的方法*/
@@ -44,13 +42,12 @@ public class MyWebSocket {
         this.session = session;
         this.tableId=tableId;
         webSocketSet.add(this);     //加入set中
-        addOnlineCount();           //在线数加1
-        System.out.println("有新连接加入！当前在线人数为" + getOnlineCount());
+        System.out.println("有新连接加入！当前在线人数为" + onlineCount.incrementAndGet());//在线数加1
     }
 
-    public static void setApplicationContext(ApplicationContext context)
-    {
-        applicationContext=context;
+    public static void setApplicationContext(ApplicationContext applicationContext)
+            throws BeansException {
+        updateController = applicationContext.getBean(UpdateController.class);
     }
 
     /**
@@ -59,8 +56,7 @@ public class MyWebSocket {
     @OnClose
     public void onClose() {
         webSocketSet.remove(this);  //从set中删除
-        subOnlineCount();           //在线数减1
-        System.out.println("有一连接关闭！当前在线人数为" + getOnlineCount());
+        System.out.println("有一连接关闭！当前在线人数为" + onlineCount.decrementAndGet());//在线数减1
     }
 
     /**
@@ -68,43 +64,43 @@ public class MyWebSocket {
      *
      * @param message 客户端发送过来的消息*/
     @OnMessage
+    @SuppressWarnings("unchecked")
     public void onMessage(String message, Session session) throws IOException,  EncodeException {
         System.out.println("来自客户端的消息:" + message);
-        updateController=(UpdateController)applicationContext.getBean(UpdateController.class);
-        Jedis jedis=new Jedis();
-        String jsonStr=jedis.get("upgrade"+tableId);
-        JSONArray jsonArray=JSONArray.fromObject(jsonStr);
-        System.out.println("!!");
-        for(int i=0;i<jsonArray.size();i++) {
-            int NO=i+1;
-            String status=jsonArray.getJSONObject(i).getString("status");
-            if(status.equals("update")||status.equals("new")) {
-//                if (!updateController.upgradeSave(i, tableId)) {
-//                    session.getBasicRemote().sendObject(-1);
-//                    System.out.println(NO);
-//                    return ;
-//                }
-            }
-            System.out.println(NO);
-            float process=(float)NO/jsonArray.size();
-            int percent=(int)Math.rint(process*100);
-            session.getBasicRemote().sendObject(percent);
+        HashMap params = JSONHelper.jsonStr2Map(message);
+        String operateName = params.get("op").toString();
+        if(operateName.equals("upgradeSave")){
+            List<Integer> indexToSave = (List<Integer>)params.get("index");
+            System.out.println("保存的下标为:");
+            indexToSave.forEach(System.out::println);
+            updateController.saveRedisData(this.tableId, indexToSave, new ProcessCallBack() {
+                @Override
+                public void onProcessChange(int currentProcess) {
+                    try {
+                        session.getBasicRemote().sendObject(currentProcess);
+                    }
+                    catch (IOException | EncodeException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+            session.getBasicRemote().sendObject(101);
         }
-        session.getBasicRemote().sendObject(101);
+
+
     }
 
 
 
      @OnError
      public void onError(Session session, Throwable error) {
-     System.out.println("发生错误");
-     error.printStackTrace();
+         System.out.println("发生错误");
+         error.printStackTrace();
      }
 
 
      public void sendMessage(String message) throws IOException {
         this.session.getBasicRemote().sendText(message);
-     //this.session.getAsyncRemote().sendText(message);
      }
 
 
@@ -122,14 +118,6 @@ public class MyWebSocket {
     }
 
     public static synchronized int getOnlineCount() {
-        return onlineCount;
-    }
-
-    public static synchronized void addOnlineCount() {
-        MyWebSocket.onlineCount++;
-    }
-
-    public static synchronized void subOnlineCount() {
-        MyWebSocket.onlineCount--;
+        return onlineCount.get();
     }
 }

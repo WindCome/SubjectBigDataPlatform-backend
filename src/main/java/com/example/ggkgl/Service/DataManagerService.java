@@ -1,12 +1,12 @@
 package com.example.ggkgl.Service;
 
 import com.example.ggkgl.AssitClass.JSONHelper;
+import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Component.SpringUtil;
 import com.example.ggkgl.Mapper.GreatMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import javax.validation.constraints.NotNull;
@@ -151,18 +151,31 @@ public class DataManagerService {
      *             {
      *                  "op":OperatorCode   操作码,
      *                  "index": Object       主键,
-     *                  "value":{}          新值
+     *                  "value":{}或String          新值
      *             }
      * @param record  是否记录当前该组操作
      */
     @SuppressWarnings("unchecked")
     @Transactional
-    public void mysqlDataRetention(int tableId,List<HashMap> data,boolean record){
-        for(HashMap x:data){
+    public void mysqlDataRetention(int tableId, List<HashMap> data, ProcessCallBack processCallBack, boolean record){
+        if(data == null || data.size() == 0){
+            return ;
+        }
+        int totalCount = data.size();
+        for(int i = 0 ; i < totalCount ; i++){
+            HashMap x = data.get(i);
             Object valueField = x.get("value");
+            if(valueField !=null && valueField instanceof String){
+                valueField = JSONHelper.jsonStr2Map(valueField.toString());
+            }
             //直接用this调用会导致aop失效
-            SpringUtil.getBean(this.getClass()).mysqlDataRetention(tableId,x.get("index"),valueField == null?null:JSONHelper.jsonStr2Map(valueField.toString()),
+            SpringUtil.getBean(this.getClass()).mysqlDataRetention(tableId,x.get("index"),(HashMap) valueField,
                     OperatorCode.valueOf(x.get("op").toString()),record);
+            if(processCallBack != null){
+                float process=(float)i/totalCount;
+                int percent=(int)Math.rint(process*100);
+                processCallBack.onProcessChange(percent);
+            }
         }
     }
 
@@ -171,7 +184,7 @@ public class DataManagerService {
      * @param tableId mysql表id
      * @param data 操作的数据
      * @param opCode 操作类型
-     * @param record  是否记录当前操作,aop调用
+     * @param record  是否记录当前操作,(aop调用,不要删除这个参数)
      * @return 旧值，无则为null
      */
     @SuppressWarnings("unchecked")

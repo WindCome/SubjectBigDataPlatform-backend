@@ -70,25 +70,36 @@ public class SpiderDataManagerService {
     }
 
     /**
-     * @param tableId  mysql表id
+     * 获取原始爬虫数据列表大小
+     */
+    public int getSizeOfData(int tableId){
+        return this.getDataListFromSpider(tableId).size();
+    }
+
+    /**
+     * 获取指定下标的原始爬虫数据
+     */
+    private HashMap getDataListFromSpider(int tableId,int index){
+        List<String> jsonData = this.getJsonDataFromSpider(tableId);
+        if(jsonData == null || index >= jsonData.size()){
+            return null;
+        }
+        return JSONHelper.jsonStr2Map(jsonData.get(index));
+    }
+
+    /**
      * @param data  数据
-     * @param index 当data == null时使用，数据在列表中的下标
+     * @param modifyInfo 修改信息
      * @return 经过修改的数据
      */
     @SuppressWarnings("unchecked")
-    public HashMap getDataFromSpiderAfterModifying(int tableId, HashMap data, Integer index){
-        HashMap map = data;
-        if(map == null){
-            List<HashMap> spiderData = this.getDataListFromSpider(tableId);
-            if(spiderData == null || index == null || index >= spiderData.size()){
-                return null;
-            }
-            map = spiderData.get(index);
+    public HashMap getDataFromSpiderAfterModifying(HashMap data, SpiderDataChangeEntity modifyInfo){
+        if(data == null){
+            return null;
         }
-        SpiderDataChangeEntity spiderDataChangeEntity = this.getSpiderDataModifyInfo(tableId, index, false);
-        if(spiderDataChangeEntity != null){
-            Map currentValue = spiderDataChangeEntity.getCurrentValue();
-            Object targetPrimaryValue = spiderDataChangeEntity.getPrimaryValue();
+        if(modifyInfo != null){
+            Map currentValue = modifyInfo.getCurrentValue();
+            Object targetPrimaryValue = modifyInfo.getPrimaryValue();
             if (currentValue == null && targetPrimaryValue == null) {
                 //delete
                 return null;
@@ -96,37 +107,49 @@ public class SpiderDataManagerService {
             if (currentValue != null) {
                 //update
                 for (Object key : currentValue.keySet()) {
-                    map.put(key, currentValue.get(key));
+                    data.put(key, currentValue.get(key));
                 }
             }
         }
-        return map;
+        return data;
     }
 
     /**
      * 将redis中的一条记录与Mysql数据库进行对比
      * @param tableId  mysql表id
-     * @param data  数据
-     * @param index 当data == null时使用，数据在列表中的下标
+     * @param index   redis数据下标
      * @return 对比结果
      */
     @SuppressWarnings("unchecked")
-    private HashMap getContrastResult(int tableId, HashMap data,Integer index){
-        HashMap map = this.getDataFromSpiderAfterModifying(tableId,data,index);
-        if(map == null){
+    public HashMap getContrastResult(int tableId, int index){
+        HashMap data = this.getDataListFromSpider(tableId,index);
+        SpiderDataChangeEntity modifyInfo = this.getSpiderDataModifyInfo(tableId,index,false);
+        data = this.getDataFromSpiderAfterModifying(data,modifyInfo);
+        return this.getContrastResult(tableId,data,modifyInfo);
+    }
+
+    /**
+     * 将redis中的一条记录与Mysql数据库进行对比
+     * @param tableId  mysql表id
+     * @param data  经过修改和删除的redis数据
+     * @param modifyInfo 修改信息
+     * @return 对比结果
+     */
+    @SuppressWarnings("unchecked")
+    private HashMap getContrastResult(int tableId, HashMap data,SpiderDataChangeEntity modifyInfo){
+        if(data == null){
             return null;
         }
-        SpiderDataChangeEntity spiderDataChangeEntity =this.getSpiderDataModifyInfo(tableId,index,false);
-        HashMap contrastResult = this.dataManagerService.contrast(tableId,map);
-        if(spiderDataChangeEntity != null){
-            Object targetPrimaryValue = spiderDataChangeEntity.getPrimaryValue();
+        HashMap contrastResult = this.dataManagerService.contrast(tableId,data);
+        if(modifyInfo != null){
+            Object targetPrimaryValue = modifyInfo.getPrimaryValue();
             if (targetPrimaryValue != null){
                 //redirect
                 HashMap targetObject = this.dataManagerService.findByIdEquals(tableId,targetPrimaryValue);
                 if(targetObject != null){
                     ArrayList dataList = (ArrayList) contrastResult.get("data");
                     dataList.add(0,targetObject);
-                    if (targetObject.equals(map)){
+                    if (targetObject.equals(data)){
                         contrastResult.put("status","same");
                     }else {
                         contrastResult.put("status","update");
@@ -162,7 +185,8 @@ public class SpiderDataManagerService {
         int startIndex = page * size;
         int coincidentIndex = 0;
         for (int i = 0 ; i < spiderData.size() ; i++){
-            HashMap map = this.getDataFromSpiderAfterModifying(tableId,spiderData.get(i),null);
+            SpiderDataChangeEntity modifyInfo = this.getSpiderDataModifyInfo(tableId,i,false);
+            HashMap map = this.getDataFromSpiderAfterModifying(spiderData.get(i),modifyInfo);
             if(map == null){
                 //爬虫数据有删除操作
                 continue;
@@ -180,10 +204,11 @@ public class SpiderDataManagerService {
                     continue;
                 }
             }
-            HashMap contrastResult = this.getContrastResult(tableId,map,i);
+            HashMap contrastResult = this.getContrastResult(tableId,map,modifyInfo);
             Assert.notNull(contrastResult,"it's impossible");
             if(targetType.equals("all") || targetType.equals(contrastResult.get("status"))){
                 if(coincidentIndex >= startIndex && coincidentIndex < (page+1)*size){
+                    contrastResult.put("index",i);
                     contrastResultList.add(contrastResult);
                 }
                 coincidentIndex++;

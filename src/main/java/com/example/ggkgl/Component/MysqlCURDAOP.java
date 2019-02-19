@@ -32,8 +32,6 @@ public class MysqlCURDAOP {
                              DataManagerService.OperatorCode opCode,boolean record) throws Throwable {
         Object returnValue;
         RecordDetailEntity recordDetail = null;
-        System.out.println("====record======");
-        System.out.println(record);
         //生成记录
         if(record){
             recordDetail = this.mysqlVersionControlService.generateRecordDetail(tableId,id,data,opCode);
