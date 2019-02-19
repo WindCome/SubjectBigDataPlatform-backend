@@ -2,6 +2,7 @@ package com.example.ggkgl.Model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
+import org.springframework.data.redis.core.index.Indexed;
 
 import javax.persistence.GeneratedValue;
 import java.io.Serializable;
@@ -18,11 +19,13 @@ public class SpiderDataChangeEntity implements Serializable{
     /**
      * 变更的数据在爬虫数据列表中的下标
      */
+    @Indexed
     private Integer index;
 
     /**
      * mysql表id
      */
+    @Indexed
     private int tableId;
 
     /**
@@ -66,4 +69,9 @@ public class SpiderDataChangeEntity implements Serializable{
     public void setCurrentValue(HashMap currentValue) {
         this.currentValue = currentValue;
     }
+
+    public Long getId() {
+        return id;
+    }
+
 }

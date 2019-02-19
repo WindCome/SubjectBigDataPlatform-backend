@@ -5,9 +5,9 @@ import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Service.*;
 import javafx.util.Pair;
-import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -92,7 +92,7 @@ public class UpdateController {
         for (String aJsonArray : jsonArray) {
             modifyList.add(JSONHelper.jsonStr2Map(aJsonArray));
         }
-        return this.spiderDataManagerService.recordModifySpiderData(tableId,modifyList);
+        return this.redisVersionControlService.recordModifySpiderData(tableId,modifyList);
     }
 
     /**
@@ -172,7 +172,7 @@ public class UpdateController {
                         UpdateController.this.spiderDataManagerService.getJsonDataFromSpider(tableId));
                 String currentVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(tableId);
                 List<Pair> changeList = UpdateController.this.redisVersionControlService.getIndexChangeDetail(tableId,oldVersion,currentVersion);
-                UpdateController.this.spiderDataManagerService.resetIndex(tableId, changeList);
+                UpdateController.this.redisVersionControlService.resetIndex(tableId, changeList);
             }
         });
     }
@@ -189,7 +189,10 @@ public class UpdateController {
 
     /**
      * 搜索更新接口
-     * @param jsonObject 搜索条件json，具体参见api文档
+     * @param jsonObject 搜索条件json，具体参见api文档,格式如下:
+     *                   {"status":String (对比结果,"same"、"update"、"new"、"all"中的一种,默认为"all"),
+         *                "condition":String  (json格式的字典,{"key":"value"})
+         *                }
      * @param tableId   表的Id（即保存在META_ENTITY中的自增字段）
      * @param page  分页
      * @param size  分页
@@ -201,21 +204,23 @@ public class UpdateController {
                                    @RequestParam(value = "page",defaultValue = "1") int page,
                                    @RequestParam(value = "size",defaultValue = "20") int size)
     {
-        HashMap<String,Object> filter = new HashMap<>();
-        filter.put("page",page-1);
-        filter.put("size",size);
-        for(Object key : jsonObject.keySet()){
-            filter.put(key.toString(),jsonObject.get(key));
-        }
         String currentVersion = this.redisVersionControlService.getCurrentVersion(tableId);
-        HashMap contrastResult = this.spiderDataManagerService.getContrastResult(tableId, filter);
-        List<HashMap> list = (List<HashMap>)contrastResult.get("result");
         int updateCount=0;
         int newCount=0;
         int sameCount=0;
-        for (HashMap map : list) {
-            String status = map.get("status").toString();
-            switch (status) {
+        String targetType = (String)jsonObject.getOrDefault("status","all");
+        HashMap condition = JSONHelper.jsonStr2Map(jsonObject.getOrDefault("condition","").toString());
+        int dataSize =  this.spiderDataManagerService.getSizeOfData(tableId);
+        List<HashMap> contrastResultList = new ArrayList<>(dataSize);
+        int startIndex = (page - 1) * size;
+        int coincidentIndex = 0;
+        for (int i = 0 ; i < dataSize ; i++){
+            HashMap contrastResult = this.spiderDataManagerService.getContrastResult(tableId,i);
+            if(contrastResult == null){
+                //爬虫数据有删除操作
+                continue;
+            }
+            switch (contrastResult.get("status").toString()) {
                 case "new":
                     newCount++;
                     break;
@@ -226,18 +231,40 @@ public class UpdateController {
                     sameCount++;
                     break;
             }
+            HashMap map = (HashMap) contrastResult.get("oriData");
+            if(condition != null){
+                //字段筛选
+                boolean match = true;
+                for(Object key:condition.keySet()){
+                    String conditionStr = condition.get(key).toString().trim();
+                    if (!map.containsKey(key) || !map.get(key).toString().contains(conditionStr)){
+                        match = false;
+                        break;
+                    }
+                }
+                if(!match){
+                    continue;
+                }
+            }
+            Assert.notNull(contrastResult,"it's impossible");
+            if(targetType.equals("all") || targetType.equals(contrastResult.get("status"))){
+                if(coincidentIndex >= startIndex && coincidentIndex < (page+1)*size){
+                    contrastResult.put("index",i);
+                    contrastResultList.add(contrastResult);
+                }
+                coincidentIndex++;
+            }
         }
         JSONObject summer=new JSONObject();
         summer.put("version",currentVersion);
-        summer.put("totalCount",contrastResult.get("totalCount"));
+        summer.put("totalCount",coincidentIndex);
         summer.put("newCount",newCount);
         summer.put("updateCount",updateCount);
         summer.put("sameCount",sameCount);
         JSONObject result = new JSONObject();
         result.put("summer",summer);
-        result.put("detail",list);
+        result.put("detail",contrastResultList);
         return result;
     }
-
 
 }
