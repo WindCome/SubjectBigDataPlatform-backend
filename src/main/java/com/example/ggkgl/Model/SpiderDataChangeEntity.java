@@ -5,7 +5,7 @@ import org.springframework.data.redis.core.RedisHash;
 
 import javax.persistence.GeneratedValue;
 import java.io.Serializable;
-import java.util.Map;
+import java.util.HashMap;
 
 /**
 * 用于记录修改爬虫数据的信息
@@ -33,7 +33,7 @@ public class SpiderDataChangeEntity implements Serializable{
     /**
      * 爬虫数据更改后的值
      */
-    private Map currentValue;
+    private HashMap currentValue;
 
     public Integer getIndex() {
         return index;
@@ -59,11 +59,11 @@ public class SpiderDataChangeEntity implements Serializable{
         this.primaryValue = primaryValue;
     }
 
-    public Map getCurrentValue() {
+    public HashMap getCurrentValue() {
         return currentValue;
     }
 
-    public void setCurrentValue(Map currentValue) {
+    public void setCurrentValue(HashMap currentValue) {
         this.currentValue = currentValue;
     }
 }

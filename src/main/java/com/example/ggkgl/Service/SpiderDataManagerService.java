@@ -167,7 +167,7 @@ public class SpiderDataManagerService {
      *               {"status":String (对比结果,"same"、"update"、"new"、"all"中的一种,默认为"all"),
      *                "page":Integer (页号，从0开始，默认为0),
      *                "size":Integer (页的大小,默认为20) ,
-     *                "condition":{}  (匹配的字段)
+     *                "condition":String  (匹配的字段)
      *                }
      * @return 符合条件的比对结果,格式如下:
      *              {"result":List<HashMap> (比对结果列表),
@@ -179,7 +179,7 @@ public class SpiderDataManagerService {
         int page = (int)filter.getOrDefault("page",0);
         int size = (int) filter.getOrDefault("size",20);
         String targetType = (String)filter.getOrDefault("status","all");
-        HashMap condition = (HashMap) filter.getOrDefault("condition",null);
+        HashMap condition = JSONHelper.jsonStr2Map(filter.getOrDefault("condition","").toString());
         List<HashMap> spiderData = this.getDataListFromSpider(tableId);
         List<HashMap> contrastResultList = new ArrayList<>(spiderData.size());
         int startIndex = page * size;
@@ -195,7 +195,8 @@ public class SpiderDataManagerService {
                 //字段筛选
                 boolean match = true;
                 for(Object key:condition.keySet()){
-                    if (!map.containsKey(key) || !map.get(key).equals(condition.get(key))){
+                    String conditionStr = condition.get(key).toString().trim();
+                    if (!map.containsKey(key) || !map.get(key).toString().contains(conditionStr)){
                         match = false;
                         break;
                     }

@@ -76,16 +76,21 @@ public class UpdateController {
     /**
      * 修改爬虫数据
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
-     * @param jsonArray 修改信息json数组
+     * @param jsonArray 修改信息json数组修改信息格式如下:
+     *                          {"op":String (不可缺省的,"DELETE"或"UPDATE",表示删除或修改),
+     *                           "index":Integer (不可缺省的,该数据在爬虫数据列表中的下标),
+     *                           "id": Object (可缺省的,mysql记录的主键值，用于指明该爬虫信息用于更新哪条mysql记录),
+     *                           "value":Map (不可缺省的,爬虫数据修改后的值)
+     *                          }
      * @return  修改成功的下标数组
      */
     @PostMapping(value = "/redis/modify/{tableId}")
     @SuppressWarnings("unchecked")
-    public Set<Integer> modifyData(@PathVariable("tableId") int tableId,@RequestBody JSONArray jsonArray)
+    public Set<Integer> modifyData(@PathVariable("tableId") int tableId,@RequestBody List<String> jsonArray)
     {
         List<HashMap> modifyList = new ArrayList<>(jsonArray.size());
-        for(int i = 0;i<jsonArray.size();i++){
-            modifyList.add(JSONHelper.jsonStr2Map(jsonArray.getString(i)));
+        for (String aJsonArray : jsonArray) {
+            modifyList.add(JSONHelper.jsonStr2Map(aJsonArray));
         }
         return this.spiderDataManagerService.recordModifySpiderData(tableId,modifyList);
     }

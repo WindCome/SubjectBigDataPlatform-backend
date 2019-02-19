@@ -2,6 +2,7 @@ package com.example.ggkgl.AssitClass;
 
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 
@@ -37,6 +38,9 @@ public class JSONHelper {
     * 根据json字符串构造map
      */
     public static HashMap<String,Object> jsonStr2Map(String jsonStr){
+        if(StringUtils.isEmpty(jsonStr)){
+            return new HashMap<>(0);
+        }
         JSONObject jsonObject = JSONObject.fromObject(jsonStr);
         return JSONHelper.json2Map(jsonObject);
     }
