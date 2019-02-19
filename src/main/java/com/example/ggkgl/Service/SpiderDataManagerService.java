@@ -229,7 +229,7 @@ public class SpiderDataManagerService {
      *                           "id": Object (mysql记录的主键值，用于指明该爬虫信息用于更新哪条mysql记录),
      *                           "value":Map (爬虫数据修改后的值)
      *                          }
-     * @return  修改的爬虫数据下标
+     * @return  发生变化的爬虫数据下标
      */
     @SuppressWarnings("unchecked")
     public Set<Integer> recordModifySpiderData(int tableId, List<HashMap> modifyInfoList){
@@ -239,21 +239,25 @@ public class SpiderDataManagerService {
             for(HashMap map :modifyInfoList){
                 OperatorCode op = OperatorCode.valueOf(map.get("op").toString());
                 int index = (int)map.get("index");
+                boolean changed = false;
                 String watcher = tableId + "modify" + index;
                 synchronized (watcher.intern()){
                     switch (op){
                         case DELETE:
                             this.deleteSpiderData(tableId, index);
+                            changed = true;
                             break;
                         case UPDATE:
-                            this.updateSpiderData(tableId, index,
+                            changed = this.updateSpiderData(tableId, index,
                                     map.getOrDefault("id",null),(Map)map.get("value"));
                             break;
                         default:
                             break;
                     }
                 }
-                result.add(index);
+                if(changed){
+                    result.add(index);
+                }
             }
         }
         catch (Exception e){
@@ -281,16 +285,29 @@ public class SpiderDataManagerService {
         this.spiderDataChangeRepository.save(spiderDataChangeEntity);
     }
 
-    private void updateSpiderData(int tableId, int index,Object newMysqlId ,Map newValue){
+    @SuppressWarnings("unchecked")
+    private boolean updateSpiderData(int tableId, int index,Object newMysqlId ,Map newValue){
         SpiderDataChangeEntity spiderDataChangeEntity = this.getSpiderDataModifyInfo(tableId, index,true);
-        if(newValue.containsKey("index")){
-            newValue.remove("index");
-        }
-        if(newMysqlId != null){
+        boolean changed = false;
+        if(newMysqlId != null && !newMysqlId.equals(spiderDataChangeEntity.getPrimaryValue())){
             spiderDataChangeEntity.setPrimaryValue(newMysqlId);
+            changed = true;
         }
-        spiderDataChangeEntity.setCurrentValue(newValue);
-        this.spiderDataChangeRepository.save(spiderDataChangeEntity);
+        if(newValue != null){
+            HashMap newValueField = new HashMap(newValue);
+            if(newValueField.containsKey("index")){
+                newValueField.remove("index");
+            }
+            Map currentValue = spiderDataChangeEntity.getCurrentValue();
+            if(!newValueField.equals(currentValue)){
+                spiderDataChangeEntity.setCurrentValue(newValueField);
+                changed = true;
+            }
+        }
+        if(changed){
+            this.spiderDataChangeRepository.save(spiderDataChangeEntity);
+        }
+        return changed;
     }
 
     /**
