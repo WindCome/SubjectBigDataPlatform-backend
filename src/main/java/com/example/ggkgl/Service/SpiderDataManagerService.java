@@ -113,7 +113,6 @@ public class SpiderDataManagerService {
     @SuppressWarnings("unchecked")
     @Cacheable(value = "SpiderContrastResult",key = "#tableId+' '+#index")
     public HashMap getContrastResult(int tableId, int index){
-        System.out.println("====step in ==== "+tableId+" "+index);
         HashMap data = this.getDataListFromSpider(tableId,index);
         SpiderDataChangeEntity modifyInfo = this.redisVersionControlService.getSpiderDataModifyInfo(tableId,index,false);
         data = this.getDataFromSpiderAfterModifying(data,modifyInfo);

@@ -118,9 +118,9 @@ public class DataManagerService {
         if(sizeOfTable == 0 || columnNames.length == 0){
             return columnNames;
         }
-        Map<String,Float> columnToDiversityFactorMap = new HashMap<>(columnNames.length);
+        LinkedHashMap<String,Float> columnToDiversityFactorMap = new LinkedHashMap<>(columnNames.length);
         for(String c:columnNames){
-            float factor = this.tableConfigService.countDistinctColumn(tableName,c)/sizeOfTable;
+            float factor = (float)this.tableConfigService.countDistinctColumn(tableName,c)/sizeOfTable;
             columnToDiversityFactorMap.put(c,factor);
         }
         columnToDiversityFactorMap = this.sortMapByValue(columnToDiversityFactorMap);
@@ -130,13 +130,22 @@ public class DataManagerService {
     /**
      * Map按value进行排序
      */
-    private Map<String, Float> sortMapByValue(Map<String, Float> oriMap) {
+    private LinkedHashMap<String, Float> sortMapByValue(Map<String, Float> oriMap) {
         if (oriMap == null || oriMap.isEmpty()) {
-            return new HashMap<>(0);
+            return new LinkedHashMap<>(0);
         }
-        Map<String, Float> sortedMap = new LinkedHashMap<>();
+        LinkedHashMap<String, Float> sortedMap = new LinkedHashMap<>();
         List<Map.Entry<String, Float>> entryList = new ArrayList<>(oriMap.entrySet());
-        entryList.sort((o1, o2) -> (int) (o2.getValue() - o1.getValue()));
+        entryList.sort((o1, o2) -> {
+            float val1 = o1.getValue();
+            float val2 = o2.getValue();
+            if(val1<val2){
+                return 1;
+            }else if (val1 > val2){
+                return -1;
+            }
+            return 0;
+        });
 
         for (Map.Entry<String, Float> tmpEntry : entryList) {
             sortedMap.put(tmpEntry.getKey(), tmpEntry.getValue());

@@ -142,6 +142,11 @@ public class RedisVersionControlService {
         return result;
     }
 
+    /**
+     * Warning!!!
+     * 不要在除recordModifySpiderData(int tableId, List<HashMap> modifyInfoList)这个方法外的其他地方调用这个函数
+     * 因为这个函数没有加锁，把它设置为public仅仅是因为缓存需要
+     */
     @SuppressWarnings("unchecked")
     @CacheEvict(value = "SpiderContrastResult",key = "#tableId+' '+#index",condition = "#result")
     public boolean recordModifySpiderData(int tableId,int index,HashMap modifyInfo){
