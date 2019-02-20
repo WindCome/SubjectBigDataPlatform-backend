@@ -248,7 +248,7 @@ public class UpdateController {
             }
             Assert.notNull(contrastResult,"it's impossible");
             if(targetType.equals("all") || targetType.equals(contrastResult.get("status"))){
-                if(coincidentIndex >= startIndex && coincidentIndex < (page+1)*size){
+                if(coincidentIndex >= startIndex && coincidentIndex < page*size){
                     contrastResult.put("index",i);
                     contrastResultList.add(contrastResult);
                 }
