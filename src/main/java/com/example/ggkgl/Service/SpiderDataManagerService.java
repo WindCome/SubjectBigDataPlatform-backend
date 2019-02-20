@@ -20,6 +20,9 @@ public class SpiderDataManagerService {
     @Resource
     private RedisVersionControlService redisVersionControlService;
 
+    @Resource
+    private TableConfigService tableConfigService;
+
     public enum OperatorCode{
         UPDATE("UPDATE"),DELETE("DELETE");
         private String value;
@@ -136,7 +139,19 @@ public class SpiderDataManagerService {
             Object targetPrimaryValue = modifyInfo.getPrimaryValue();
             if (targetPrimaryValue != null){
                 //redirect
-                HashMap targetObject = this.dataManagerService.findByIdEquals(tableId,targetPrimaryValue);
+                String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
+                List<HashMap> similarData = (List<HashMap>)contrastResult.get("data");
+                HashMap targetObject = null;
+                for(HashMap map :similarData){
+                    if(map.containsKey(primaryKey) && map.get(primaryKey).equals(targetPrimaryValue)){
+                        targetObject = map;
+                        similarData.remove(map);
+                        break;
+                    }
+                }
+                if(targetObject == null){
+                    targetObject = this.dataManagerService.findByIdEquals(tableId,targetPrimaryValue);
+                }
                 if(targetObject != null){
                     ArrayList dataList = (ArrayList) contrastResult.get("data");
                     dataList.add(0,targetObject);
