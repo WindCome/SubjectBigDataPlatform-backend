@@ -219,6 +219,7 @@ public class RedisVersionControlService {
      */
     public List<Pair> resetIndex(int tableId,List<Pair> indexChangeDetails){
         List<Pair> invalidChange = new ArrayList<>();
+        List<Long> indexToChange = new ArrayList<>(indexChangeDetails.size());
         this.lock.writeLock().lock();
         try{
             for(Pair change:indexChangeDetails){
@@ -231,6 +232,12 @@ public class RedisVersionControlService {
                     entity.setIndex(newIndex);
                     this.spiderDataChangeRepository.save(entity);
                 }
+                indexToChange.add((Long)change.getKey());
+            }
+            List<Long> historyList = this.spiderDataChangeRepository.findIdAll();
+            historyList.retainAll(indexToChange);
+            for(Long id:historyList){
+                this.spiderDataChangeRepository.deleteById(id);
             }
         }catch (Exception e){
             e.printStackTrace();

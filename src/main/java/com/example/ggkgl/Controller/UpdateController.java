@@ -74,7 +74,7 @@ public class UpdateController {
     }
 
     /**
-     * 修改爬虫数据
+     * 修改爬虫数据,并保存至mysql数据库
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
      * @param jsonArray 修改信息json数组修改信息格式如下:
      *                          {"op":String (不可缺省的,"DELETE"或"UPDATE",表示删除或修改),
@@ -92,7 +92,9 @@ public class UpdateController {
         for (String aJsonArray : jsonArray) {
             modifyList.add(JSONHelper.jsonStr2Map(aJsonArray));
         }
-        return this.redisVersionControlService.recordModifySpiderData(tableId,modifyList);
+        Set<Integer> index = this.redisVersionControlService.recordModifySpiderData(tableId,modifyList);
+        this.saveRedisData(tableId,new ArrayList<>(index),null);
+        return index;
     }
 
     /**
@@ -110,7 +112,7 @@ public class UpdateController {
     /**
      * 保存爬虫数据
      * @param tableId mysql表id
-     * @param indexList 爬虫数据下标数组,null或者大小为0时保存全部
+     * @param indexList 爬虫数据下标数组,null时保存全部
      * @return  true成功 false失败
      */
     @PostMapping(value = "/redis/save/{tableId}")
@@ -120,6 +122,8 @@ public class UpdateController {
         if(indexList == null){
             int size = this.spiderDataManagerService.getSizeOfData(tableId);
             indexList = IntStream.iterate(0, n -> n + 1).limit(size).boxed().collect(Collectors.toList());
+        }else if(indexList.size() == 0){
+            return true;
         }
         String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
         List<HashMap> data = new ArrayList<>(indexList.size());

@@ -118,21 +118,28 @@ public class SpiderDataManagerService {
     public HashMap getContrastResult(int tableId, int index){
         HashMap data = this.getDataListFromSpider(tableId,index);
         SpiderDataChangeEntity modifyInfo = this.redisVersionControlService.getSpiderDataModifyInfo(tableId,index,false);
-        data = this.getDataFromSpiderAfterModifying(data,modifyInfo);
         return this.getContrastResult(tableId,data,modifyInfo);
     }
 
     /**
      * 将redis中的一条记录与Mysql数据库进行对比
      * @param tableId  mysql表id
-     * @param data  经过修改和删除的redis数据
+     * @param oriData  未经修改的redis数据
      * @param modifyInfo 修改信息
      * @return 对比结果
      */
     @SuppressWarnings("unchecked")
-    private HashMap getContrastResult(int tableId, HashMap data,SpiderDataChangeEntity modifyInfo){
-        if(data == null){
+    private HashMap getContrastResult(int tableId, HashMap oriData,SpiderDataChangeEntity modifyInfo){
+        if(oriData == null){
             return null;
+        }
+        HashMap data =  this.getDataFromSpiderAfterModifying(oriData,modifyInfo);
+        if(data == null){
+            HashMap contrastResult = new HashMap(3);
+            contrastResult.put("status","delete");
+            contrastResult.put("data",new ArrayList<>(0));
+            contrastResult.put("oriData",oriData);
+            return contrastResult;
         }
         HashMap contrastResult = this.dataManagerService.contrast(tableId,data);
         if(modifyInfo != null){
