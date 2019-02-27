@@ -1,6 +1,7 @@
 package com.example.ggkgl.Controller;
 
 import com.example.ggkgl.AssitClass.Change;
+import com.example.ggkgl.AssitClass.ExceptionHelper;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Service.DataManagerService;
@@ -10,8 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.util.*;
 
 
@@ -58,7 +57,7 @@ public class AllController {
             return null;
         }catch (Exception e){
             e.printStackTrace();
-            return this.getExceptionAllInfo(e);
+            return ExceptionHelper.getExceptionAllInfo(e);
         }
     }
 
@@ -79,7 +78,7 @@ public class AllController {
             return null;
         }catch (Exception e){
             e.printStackTrace();
-            return this.getExceptionAllInfo(e);
+            return ExceptionHelper.getExceptionAllInfo(e);
         }
     }
 
@@ -103,30 +102,8 @@ public class AllController {
             return null;
         }catch (Exception e){
             e.printStackTrace();
-            return this.getExceptionAllInfo(e);
+            return ExceptionHelper.getExceptionAllInfo(e);
         }
-    }
-
-    private String getExceptionAllInfo(Exception ex) {
-        ByteArrayOutputStream out;
-        PrintStream pout = null;
-        String ret;
-        try {
-            out = new ByteArrayOutputStream();
-            pout = new PrintStream(out);
-            ex.printStackTrace(pout);
-            ret = new String(out.toByteArray());
-            out.close();
-        }
-        catch (Exception e) {
-            return ex.getMessage();
-        }
-        finally {
-            if (pout != null) {
-                pout.close();
-            }
-        }
-        return ret;
     }
 
     /**

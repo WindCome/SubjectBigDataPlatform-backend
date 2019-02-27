@@ -24,7 +24,7 @@ public class SpiderDataManagerService {
     private TableConfigService tableConfigService;
 
     public enum OperatorCode{
-        UPDATE("UPDATE"),DELETE("DELETE");
+        UPDATE("UPDATE"),DELETE("DELETE"),RESET("RESET");
         private String value;
         OperatorCode(String value){
             this.value = value;
@@ -88,19 +88,14 @@ public class SpiderDataManagerService {
     private HashMap getDataFromSpiderAfterModifying(HashMap data, SpiderDataChangeEntity modifyInfo){
         if(data == null){
             return null;
+        }else if(modifyInfo == null){
+            return data;
         }
-        if(modifyInfo != null){
-            Map currentValue = modifyInfo.getCurrentValue();
-            Object targetPrimaryValue = modifyInfo.getPrimaryValue();
-            if (currentValue == null && targetPrimaryValue == null) {
-                //delete
-                return null;
-            }
-            if (currentValue != null) {
-                //update
-                for (Object key : currentValue.keySet()) {
-                    data.put(key, currentValue.get(key));
-                }
+        Map currentValue = modifyInfo.getCurrentValue();
+        if (currentValue != null) {
+            //update
+            for (Object key : currentValue.keySet()) {
+                data.put(key, currentValue.get(key));
             }
         }
         return data;
@@ -133,8 +128,9 @@ public class SpiderDataManagerService {
         if(oriData == null){
             return null;
         }
-        HashMap data =  this.getDataFromSpiderAfterModifying(oriData,modifyInfo);
-        if(data == null){
+        HashMap data = this.getDataFromSpiderAfterModifying(oriData,modifyInfo);
+        if(modifyInfo !=null && modifyInfo.isDelete()){
+            //delete
             HashMap contrastResult = new HashMap(3);
             contrastResult.put("status","delete");
             contrastResult.put("data",new ArrayList<>(0));

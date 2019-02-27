@@ -74,27 +74,60 @@ public class UpdateController {
     }
 
     /**
-     * 修改爬虫数据,并保存至mysql数据库
+     * 修改爬虫数据
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
-     * @param jsonArray 修改信息json数组修改信息格式如下:
-     *                          {"op":String (不可缺省的,"DELETE"或"UPDATE",表示删除或修改),
-     *                           "index":Integer (不可缺省的,该数据在爬虫数据列表中的下标),
-     *                           "id": Object (可缺省的,mysql记录的主键值，用于指明该爬虫信息用于更新哪条mysql记录),
-     *                           "value":Map (不可缺省的,爬虫数据修改后的值)
-     *                          }
-     * @return  修改成功的下标数组
+     * @param index  该数据在爬虫数据列表中的下标
+     * @param jsonObject 修改信息json数组修改信息格式如下:
+     *                           {"id": Object (可缺省的,mysql记录的主键值，用于指明该爬虫信息用于更新哪条mysql记录),
+     *                           "value":Map (不可缺省的,爬虫数据修改后的值)}
+     * @return  修改结果信息{"key":String ("success"或者"fail"),"value":String (成功时为空字符串,失败时为报错信息)}
      */
-    @PostMapping(value = "/redis/modify/{tableId}")
+    @PostMapping(value = "/spider/update/{tableId}")
     @SuppressWarnings("unchecked")
-    public Set<Integer> modifyData(@PathVariable("tableId") int tableId,@RequestBody List<String> jsonArray)
+    public Pair<String,String> updateSpiderData(@PathVariable("tableId") int tableId,@RequestParam int index,
+                                                @RequestBody JSONObject jsonObject)
     {
-        List<HashMap> modifyList = new ArrayList<>(jsonArray.size());
-        for (String aJsonArray : jsonArray) {
-            modifyList.add(JSONHelper.jsonStr2Map(aJsonArray));
+        jsonObject.put("op", SpiderDataManagerService.OperatorCode.UPDATE);
+        jsonObject.put("index",index);
+        return this.redisVersionControlService.recordModifySpiderData(tableId,JSONHelper.json2Map(jsonObject));
+    }
+
+    /**
+     * 恢复已被删除的爬虫数据
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @param index 该数据在爬虫数据列表中的下标
+     * @return  修改结果信息,格式如下:
+     *      {"key":String ("success"或者"fail"),"value":String (成功时为恢复后的对比结果json字符串,失败时为报错信息)}
+     */
+    @GetMapping(value = "/spider/reset/{tableId}")
+    @SuppressWarnings("unchecked")
+    public Pair<String,String> resetSpiderData(@PathVariable("tableId") int tableId,@RequestParam("index") int index)
+    {
+        HashMap params = new HashMap(2);
+        params.put("op", SpiderDataManagerService.OperatorCode.RESET);
+        params.put("index",index);
+        Pair<String,String> result = this.redisVersionControlService.recordModifySpiderData(tableId,params);
+        if(result.getKey().equals("success")){
+            HashMap contrastResult = this.spiderDataManagerService.getContrastResult(tableId,index);
+            result = new Pair<>("success",JSONHelper.map2Json(contrastResult));
         }
-        Set<Integer> index = this.redisVersionControlService.recordModifySpiderData(tableId,modifyList);
-        this.saveRedisData(tableId,new ArrayList<>(index),null);
-        return index;
+        return result;
+    }
+
+    /**
+     * 删除爬虫数据
+     * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
+     * @param index 该数据在爬虫数据列表中的下标
+     * @return  修改结果信息{"key":String ("success"或者"fail"),"value":String (成功时为空字符串,失败时为报错信息)}
+     */
+    @DeleteMapping(value = "/spider/delete/{tableId}")
+    @SuppressWarnings("unchecked")
+    public Pair<String,String> deleteSpiderData(@PathVariable("tableId") int tableId,@RequestParam("index") int index)
+    {
+        HashMap params = new HashMap(2);
+        params.put("op", SpiderDataManagerService.OperatorCode.DELETE);
+        params.put("index",index);
+        return this.redisVersionControlService.recordModifySpiderData(tableId,params);
     }
 
     /**

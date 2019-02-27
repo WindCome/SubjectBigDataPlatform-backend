@@ -1,5 +1,6 @@
 package com.example.ggkgl.Service;
 
+import com.example.ggkgl.AssitClass.ExceptionHelper;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Component.SpringUtil;
 import com.example.ggkgl.Mapper.SpiderDataChangeRepository;
@@ -76,8 +77,8 @@ public class RedisVersionControlService {
     public List<Pair> getIndexChangeDetail(int tableId,String fromVersion,String toVersion){
         Jedis jedis = new Jedis();
         Map<String,Object> data = JSONHelper.jsonStr2Map(jedis.get("version_change"+tableId));
-        Pair versionInfo = (Pair)data.get("versions");
-        if (!versionInfo.getKey().equals(fromVersion) || !versionInfo.getValue().equals(toVersion)){
+        JSONObject versionInfo = (JSONObject)data.get("versions");
+        if (!versionInfo.getString("key").equals(fromVersion) || !versionInfo.getString("value").equals(toVersion)){
             return null;
         }
         return (List<Pair>)data.get("detail");
@@ -112,7 +113,7 @@ public class RedisVersionControlService {
     /**
      * 记录爬虫修改情况
      * @param tableId   mysql表id
-     * @param modifyInfoList    修改列表,修改信息格式如下:
+     * @param modifyInfo    修改信息,格式如下:
      *                          {"op":String ("DELETE"或"UPDATE",表示删除或修改),
      *                           "index":Integer (该数据在爬虫数据列表中的下标),
      *                           "id": Object (mysql记录的主键值，用于指明该爬虫信息用于更新哪条mysql记录),
@@ -121,21 +122,20 @@ public class RedisVersionControlService {
      * @return  发生变化的爬虫数据下标
      */
     @SuppressWarnings("unchecked")
-    public Set<Integer> recordModifySpiderData(int tableId, List<HashMap> modifyInfoList){
-        Set<Integer> result = new HashSet<>(modifyInfoList.size());
+    public Pair<String,String> recordModifySpiderData(int tableId, HashMap modifyInfo){
+        if(modifyInfo == null){
+            return new Pair<>("fail","修改信息为空");
+        }
+        Pair<String,String> result = new Pair<>("success","");
         this.lock.readLock().lock();
         try{
-            for(HashMap map :modifyInfoList){
-                int index = (int)map.get("index");
-                //直接调用会导致缓存清除失败
-                RedisVersionControlService redisVersionControlService = SpringUtil.getBean(RedisVersionControlService.class);
-                if(redisVersionControlService.recordModifySpiderData(tableId,index,map)){
-                    result.add(index);
-                }
-            }
+            int index = (int)modifyInfo.get("index");
+            //直接调用会导致缓存清除失败
+            RedisVersionControlService redisVersionControlService = SpringUtil.getBean(RedisVersionControlService.class);
+            redisVersionControlService.recordModifySpiderData(tableId,index,modifyInfo);
         }
         catch (Exception e){
-            e.printStackTrace();
+            result = new Pair<>("fail",ExceptionHelper.getExceptionAllInfo(e));
         }finally {
             this.lock.readLock().unlock();
         }
@@ -163,6 +163,8 @@ public class RedisVersionControlService {
                     changed = this.updateSpiderData(tableId, index,
                             modifyInfo.getOrDefault("id",null),(Map)modifyInfo.get("value"));
                     break;
+                case RESET:
+                    changed = this.resetSpiderData(tableId, index);
                 default:
                     break;
             }
@@ -181,10 +183,19 @@ public class RedisVersionControlService {
         return spiderDataChangeEntity;
     }
 
+    private boolean resetSpiderData(int tableId,int index){
+        SpiderDataChangeEntity spiderDataChangeEntity = this.getSpiderDataModifyInfo(tableId, index, false);
+        if(spiderDataChangeEntity == null || !spiderDataChangeEntity.isDelete()){
+            return false;
+        }
+        spiderDataChangeEntity.setDelete(false);
+        this.spiderDataChangeRepository.save(spiderDataChangeEntity);
+        return true;
+    }
+
     private void deleteSpiderData(int tableId,int index){
         SpiderDataChangeEntity spiderDataChangeEntity = this.getSpiderDataModifyInfo(tableId, index,true);
-        spiderDataChangeEntity.setCurrentValue(null);
-        spiderDataChangeEntity.setPrimaryValue(null);
+        spiderDataChangeEntity.setDelete(true);
         this.spiderDataChangeRepository.save(spiderDataChangeEntity);
     }
 
@@ -218,6 +229,9 @@ public class RedisVersionControlService {
      * @return 失效的记录
      */
     public List<Pair> resetIndex(int tableId,List<Pair> indexChangeDetails){
+        if(indexChangeDetails == null || indexChangeDetails.size() == 0){
+            return new ArrayList<>(0);
+        }
         List<Pair> invalidChange = new ArrayList<>();
         List<Long> indexToChange = new ArrayList<>(indexChangeDetails.size());
         this.lock.writeLock().lock();

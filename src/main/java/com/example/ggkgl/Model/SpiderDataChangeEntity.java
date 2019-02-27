@@ -38,6 +38,8 @@ public class SpiderDataChangeEntity implements Serializable{
      */
     private HashMap currentValue;
 
+    private Boolean isDelete = false;
+
     public Integer getIndex() {
         return index;
     }
@@ -74,4 +76,11 @@ public class SpiderDataChangeEntity implements Serializable{
         return id;
     }
 
+    public boolean isDelete() {
+        return isDelete != null && isDelete;
+    }
+
+    public void setDelete(boolean delete) {
+        isDelete = delete;
+    }
 }
