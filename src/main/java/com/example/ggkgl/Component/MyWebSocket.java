@@ -86,11 +86,7 @@ public class MyWebSocket {
             });
             session.getBasicRemote().sendObject(101);
         }
-
-
     }
-
-
 
      @OnError
      public void onError(Session session, Throwable error) {
@@ -117,7 +113,7 @@ public class MyWebSocket {
         }
     }
 
-    public static synchronized int getOnlineCount() {
+    public static int getOnlineCount() {
         return onlineCount.get();
     }
 }

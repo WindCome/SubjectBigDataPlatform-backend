@@ -1,5 +1,6 @@
 package com.example.ggkgl.Service;
 
+import org.apache.log4j.Logger;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -19,6 +20,8 @@ public class SpiderService {
     private static final String DEFAULT_SPIDERS_PATH = "D:\\Project\\ConfigurableSpiders\\ConfigurableSpiders";
 
     private ConcurrentHashMap<Integer,Thread> spiderThreads = new ConcurrentHashMap<>();
+
+    private final Logger logger = Logger.getLogger(SpiderService.class);
 
     public interface CrawlCallBack {
         /**
@@ -40,11 +43,11 @@ public class SpiderService {
      */
     public long execCrawl(String spiderPath, String execCommand,CrawlCallBack callBack){
         final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
-        Thread spiderThread = this.getSpiderThread(spiderPath,execCommand);
+        Thread spiderThread = this.getSpiderThread(spiderExecPath,execCommand);
         if(spiderThread != null && !this.isSpiderCrawlFinish(spiderThread.getId())){
             return spiderThread.getId();
         }
-        Integer hashKey = Objects.hash(execCommand, spiderPath);
+        Integer hashKey = Objects.hash(execCommand, spiderExecPath);
         synchronized (hashKey.toString().intern()){
             if(this.spiderThreads.containsKey(hashKey)){
                 long tid = this.spiderThreads.get(hashKey).getId();
@@ -63,8 +66,10 @@ public class SpiderService {
                     Process process = processBuilder.start();
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream(),"utf-8"));
                     String line;
-                    while ((line = bufferedReader.readLine()) != null)
-                        System.out.println(line);
+                    while ((line = bufferedReader.readLine()) != null){
+                        SpiderService.this.logger.info(line);
+                    }
+
                     bufferedReader.close();
                     process.waitFor();
                     if(callBack!=null){
@@ -99,10 +104,8 @@ public class SpiderService {
     }
 
     private Thread getSpiderThread(String spiderPath, String execCommand){
-        if(spiderPath == null){
-            spiderPath = SpiderService.DEFAULT_SPIDERS_PATH;
-        }
-        Integer hashKey = Objects.hash(execCommand,spiderPath);
+        final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
+        Integer hashKey = Objects.hash(execCommand,spiderExecPath);
         if(this.spiderThreads.containsKey(hashKey)){
             return this.spiderThreads.get(hashKey);
         }
