@@ -124,4 +124,26 @@ public class TableConfigService {
     public long countDistinctColumn(String tableName,String columnName){
         return this.greatMapper.countDistinctColumn(tableName,columnName);
     }
+
+    public String getSpiderCommand(int tableId){
+        String tableName= this.getTableNameById(tableId);
+        JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
+        JSONObject upgradeJson = allJson.getJSONObject("upgrade");
+        if(upgradeJson.has("command")){
+            return upgradeJson.getJSONObject("command").getString("value");
+        }else{
+            return null;
+        }
+    }
+
+    public String getSpiderPath(int tableId){
+        String tableName= this.getTableNameById(tableId);
+        JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
+        JSONObject upgradeJson = allJson.getJSONObject("upgrade");
+        if(upgradeJson.has("path")){
+            return upgradeJson.getJSONObject("path").getString("value");
+        }else{
+            return null;
+        }
+    }
 }

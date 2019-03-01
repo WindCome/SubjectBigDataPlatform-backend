@@ -2,7 +2,7 @@ package com.example.ggkgl.Controller;
 
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.AssitClass.ProcessCallBack;
-import com.example.ggkgl.Mapper.GreatMapper;
+import com.example.ggkgl.Model.LogInfoEntity;
 import com.example.ggkgl.Service.*;
 import javafx.util.Pair;
 import net.sf.json.JSONObject;
@@ -21,9 +21,6 @@ import java.util.stream.IntStream;
 @RestController
 @CrossOrigin
 public class UpdateController {
-    @Resource
-    private GreatMapper greatMapper;
-
     private final SpiderService spiderService;
 
     private final RedisVersionControlService redisVersionControlService;
@@ -191,11 +188,9 @@ public class UpdateController {
     @GetMapping(value = "/generateUpgrade/{tableId}")
     public long generate(@PathVariable("tableId") int tableId)
     {
-        String tableName= this.tableConfigService.getTableNameById(tableId);
-        JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
-        JSONObject upgradeJson = allJson.getJSONObject("upgrade");
-        JSONObject command=upgradeJson.getJSONObject("command");
-        return this.spiderService.execCrawl(null, command.getString("value"),
+        String command = this.tableConfigService.getSpiderCommand(tableId);
+        String spiderPath = this.tableConfigService.getSpiderPath(tableId);
+        return this.spiderService.execCrawl(spiderPath, command,
                 new SpiderService.CrawlCallBack(){
             private Object dataDump = null;
             @Override
@@ -245,6 +240,7 @@ public class UpdateController {
         int updateCount=0;
         int newCount=0;
         int sameCount=0;
+        int deleteCount = 0;
         String targetType = (String)jsonObject.getOrDefault("status","all");
         HashMap condition = JSONHelper.jsonStr2Map(jsonObject.getOrDefault("condition","").toString());
         int dataSize =  this.spiderDataManagerService.getSizeOfData(tableId);
@@ -266,6 +262,9 @@ public class UpdateController {
                     break;
                 case "same":
                     sameCount++;
+                    break;
+                case "delete":
+                    deleteCount++;
                     break;
             }
             HashMap map = (HashMap) contrastResult.get("oriData");
@@ -298,10 +297,22 @@ public class UpdateController {
         summer.put("newCount",newCount);
         summer.put("updateCount",updateCount);
         summer.put("sameCount",sameCount);
+        summer.put("deleteCount",deleteCount);
         JSONObject result = new JSONObject();
         result.put("summer",summer);
         result.put("detail",contrastResultList);
         return result;
     }
 
+    /**
+     * 获取上次爬虫运行Log
+     * @param tableId  表的Id（即保存在META_ENTITY中的自增字段）
+     * @return 日志信息
+     */
+    @GetMapping(value = "/spider/log/{tableId}")
+    public LogInfoEntity getCrawlLog(@PathVariable("tableId")int tableId){
+        String command = this.tableConfigService.getSpiderCommand(tableId);
+        String spiderPath = this.tableConfigService.getSpiderPath(tableId);
+        return this.spiderService.getLastCrawlLog(spiderPath,command);
+    }
 }
