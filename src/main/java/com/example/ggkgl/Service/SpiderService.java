@@ -155,6 +155,6 @@ public class SpiderService {
         final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
         String key = this.getHashKey(spiderExecPath,execCommand).toString();
         Optional<LogInfoEntity> optional = this.logRepository.findById(key);
-        return optional.orElseGet(LogInfoEntity::new);
+        return optional.orElse(null);
     }
 }

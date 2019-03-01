@@ -1,16 +1,24 @@
 spring:
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
-    url: jdbc:mysql://211.71.15.42:3306/bkdata?useSSL=false
+    url: jdbc:mysql://localhost:3306/bkdata?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+    # jdbc:mysql://211.71.15.42:3306/bkdata?useSSL=false
     username: root
-    password: g304g304
+    password: 12345
+    # g304g304
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
 
   redis:
-    host: 192.168.48.1
+    host: localhost
     port: 6379
     timeout: 300s
   session:
     timeout: 5000s
+  cache:
+    type: redis
 
 server:
   port: 8081
