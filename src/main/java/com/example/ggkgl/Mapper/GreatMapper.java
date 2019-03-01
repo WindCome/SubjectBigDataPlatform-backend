@@ -1,5 +1,6 @@
 package com.example.ggkgl.Mapper;
 
+import javafx.util.Pair;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -23,7 +24,8 @@ public interface GreatMapper {
     void updateDesc(@Param("tableName")String tableName,@Param("desc")String desc);
     String freeSearch(@Param("tableName")String tableName,@Param("field") String field
             ,@Param("index") String index);
-    List<HashMap> comboSearch(HashMap map);
+    List<HashMap> comboSearch(@Param("tableName")String tableName, @Param("conditions")List<Pair<String,String>> conditions, @Param("start") int start, @Param("length") int length);
+    long comboCount(@Param("tableName")String tableName,@Param("conditions")List<Pair<String,String>> conditions);
     String findPrimaryKey(@Param("tableName")String tableName);
     String findColumnType(@Param("tableName")String tableName,@Param("columnName") String columnName);
     long countDistinctColumn(@Param("tableName")String tableName,@Param("columnName") String columnName);

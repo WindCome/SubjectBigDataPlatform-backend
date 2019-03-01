@@ -1,6 +1,5 @@
 package com.example.ggkgl.Controller;
 
-import com.example.ggkgl.AssitClass.Change;
 import com.example.ggkgl.AssitClass.ExceptionHelper;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
@@ -204,41 +203,14 @@ public class AllController {
      */
     @PostMapping(value = "/freeSearch/{tableId}")
     public List<HashMap> freeSearch(@RequestBody JSONObject jsonObject,@PathVariable("tableId") int tableId
-                                    ,@RequestParam(value="page",defaultValue = "-1") int page,
-                                    @RequestParam(value = "size",defaultValue = "-1") int size)
+                                    ,@RequestParam(value="page",defaultValue = "0") int page,
+                                    @RequestParam(value = "size",defaultValue = "0") int size)
     {
-        String tableName=this.tableConfigService.getTableNameById(tableId);
-        List<Change> changes=new ArrayList<>();
-        for(Object key:jsonObject.keySet())
-        {
-            Change change=new Change();
-            change.setKey(key.toString());
-            change.setValue(jsonObject.get(key).toString());
-            changes.add(change);
-        }
-        HashMap<String,Object> map=new HashMap<>();
-        map.put("conditions",changes);
-        map.put("tableName",tableName);
-        List<HashMap> resultMaps=new ArrayList<>();
-        List<HashMap> searchMaps=greatMapper.comboSearch(map);
+        List<HashMap> searchMaps=this.dataManagerService.conditionSearch(jsonObject,tableId,page,size);
         HashMap<String,Object> hashMap=new HashMap<>();
-        hashMap.put("totalSize",searchMaps.size());
-        if(page==-1||size==-1)
-        {
-            searchMaps.add(hashMap);
-            return searchMaps;
-        }
-        else
-        {
-            int start=(page-1)*size;
-            int end=start+size;
-            for(int j=start;j<searchMaps.size()&&j<end;j++)
-            {
-                resultMaps.add(searchMaps.get(j));
-            }
-            resultMaps.add(hashMap);
-            return resultMaps;
-        }
+        hashMap.put("totalSize",this.dataManagerService.conditionCount(jsonObject,tableId));
+        searchMaps.add(hashMap);
+        return searchMaps;
     }
 
 }

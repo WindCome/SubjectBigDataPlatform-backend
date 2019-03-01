@@ -4,6 +4,8 @@ import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Component.SpringUtil;
 import com.example.ggkgl.Mapper.GreatMapper;
+import javafx.util.Pair;
+import net.sf.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
@@ -243,5 +245,40 @@ public class DataManagerService {
         String tableName = this.tableConfigService.getTableNameById(tableId);
         List<HashMap> result = this.greatMapper.freeInspect(tableName,primaryKey,id.toString());
         return result == null ? null : result.get(0);
+    }
+
+    /**
+     * 条件查询
+     * @param conditionFilter 筛选条件{筛选字段:目的值}
+     * @param tableId  表id
+     * @param page 页号(从1开始，<=0代表不分页)
+     * @param size 页大小(<=0代表不分页)
+     * @return 查询结果
+     */
+    public List<HashMap> conditionSearch(JSONObject conditionFilter,int tableId,int page,int size){
+        String tableName=this.tableConfigService.getTableNameById(tableId);
+        int start=(page-1)*size;
+        return greatMapper.comboSearch(tableName,this.filter2List(conditionFilter),start,size);
+    }
+
+    /**
+     * 条件统计
+     * @param conditionFilter 筛选条件{筛选字段:目的值}
+     * @param tableId  表id
+     * @return 统计结果
+     */
+    public long conditionCount(JSONObject conditionFilter,int tableId){
+        String tableName=this.tableConfigService.getTableNameById(tableId);
+        return greatMapper.comboCount(tableName,this.filter2List(conditionFilter));
+    }
+
+    private List<Pair<String,String>> filter2List(JSONObject conditionFilter){
+        List<Pair<String,String>> conditions=new ArrayList<>();
+        for(Object key:conditionFilter.keySet())
+        {
+            Pair<String,String> condition = new Pair<>(key.toString(),conditionFilter.get(key).toString());
+            conditions.add(condition);
+        }
+        return conditions;
     }
 }
