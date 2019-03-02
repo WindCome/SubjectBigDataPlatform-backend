@@ -3,7 +3,10 @@ package com.example.ggkgl.Component;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+
+import java.util.Map;
 
 @Component
 public class SpringUtil implements ApplicationContextAware {
@@ -38,4 +41,7 @@ public class SpringUtil implements ApplicationContextAware {
         return getApplicationContext().getBean(name, clazz);
     }
 
+    public static <T>Map<String, T> getBeansOfType(@Nullable Class<T> type){
+        return getApplicationContext().getBeansOfType(type);
+    }
 }

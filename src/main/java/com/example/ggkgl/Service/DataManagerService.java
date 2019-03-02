@@ -258,6 +258,9 @@ public class DataManagerService {
     public List<HashMap> conditionSearch(JSONObject conditionFilter,int tableId,int page,int size){
         String tableName=this.tableConfigService.getTableNameById(tableId);
         int start=(page-1)*size;
+        if(conditionFilter == null){
+            conditionFilter = new JSONObject();
+        }
         return greatMapper.comboSearch(tableName,this.filter2List(conditionFilter),start,size);
     }
 
