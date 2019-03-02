@@ -125,6 +125,9 @@ public class TableConfigService {
         return this.greatMapper.countDistinctColumn(tableName,columnName);
     }
 
+    /**
+     * 查询爬虫启动命令
+     */
     public String getSpiderCommand(int tableId){
         String tableName= this.getTableNameById(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
@@ -136,6 +139,9 @@ public class TableConfigService {
         }
     }
 
+    /**
+     * 查询爬虫安装目录
+     */
     public String getSpiderPath(int tableId){
         String tableName= this.getTableNameById(tableId);
         JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
