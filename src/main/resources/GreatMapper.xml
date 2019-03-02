@@ -43,6 +43,14 @@
             <foreach collection="conditions" separator="and" item="condition" index="index">
                 ${condition.key} like '%${condition.value}%'
             </foreach>
+            <if test="start >=0 and length >=0">limit ${start} ,${length}</if>
+    </select>
+
+    <select id="comboCount" statementType="STATEMENT" resultType="long">
+        select count(*) from ${tableName} where
+        <foreach collection="conditions" separator="and" item="condition" index="index">
+            ${condition.key} like '%${condition.value}%'
+        </foreach>
     </select>
 
     <update id="update" statementType="STATEMENT">
