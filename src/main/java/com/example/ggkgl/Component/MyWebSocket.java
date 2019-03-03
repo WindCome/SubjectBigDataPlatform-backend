@@ -3,8 +3,11 @@ package com.example.ggkgl.Component;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Controller.UpdateController;
+import com.example.ggkgl.Service.ThreadManagerService;
+import net.sf.json.JSONObject;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
+import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
 import javax.websocket.*;
 import javax.websocket.server.PathParam;
@@ -35,6 +38,8 @@ public class MyWebSocket {
 
     private static UpdateController updateController;
 
+    private static ThreadManagerService threadManagerService;
+
     /**
      * 连接建立成功调用的方法*/
     @OnOpen
@@ -48,6 +53,7 @@ public class MyWebSocket {
     public static void setApplicationContext(ApplicationContext applicationContext)
             throws BeansException {
         updateController = applicationContext.getBean(UpdateController.class);
+        threadManagerService = applicationContext.getBean(ThreadManagerService.class);
     }
 
     /**
@@ -70,22 +76,29 @@ public class MyWebSocket {
         HashMap params = JSONHelper.jsonStr2Map(message);
         String operateName = params.get("op").toString();
         if(operateName.equals("upgradeSave")){
-            List<Integer> indexToSave = (List<Integer>)params.get("index");
-            System.out.println("保存的下标为:");
-            indexToSave.forEach(System.out::println);
-            updateController.saveRedisData(this.tableId, indexToSave, new ProcessCallBack() {
-                @Override
-                public void onProcessChange(int currentProcess) {
-                    try {
-                        session.getBasicRemote().sendObject(currentProcess);
-                    }
-                    catch (IOException | EncodeException e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
-            session.getBasicRemote().sendObject(101);
+            this.handleSaveRedisData(params);
+        }else if(operateName.equals("cancelJob")){
+            threadManagerService.terminateThread(Long.valueOf(params.get("jobId").toString()));
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void handleSaveRedisData(HashMap params) throws IOException, EncodeException {
+        List<Integer> indexToSave = (List<Integer>)params.getOrDefault("index",null);
+//        System.out.println("保存的下标为:");
+//        indexToSave.forEach(System.out::println);
+        updateController.saveRedisData(this.tableId, indexToSave, new ProcessCallBack() {
+            @Override
+            public void onProcessChange(int currentProcess) {
+                try {
+                    session.getBasicRemote().sendObject(currentProcess);
+                }
+                catch (IOException | EncodeException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        session.getBasicRemote().sendObject(101);
     }
 
      @OnError
@@ -97,6 +110,11 @@ public class MyWebSocket {
 
      public void sendMessage(String message) throws IOException {
         this.session.getBasicRemote().sendText(message);
+     }
+
+    @JmsListener(destination = "progress_object")
+     public void sendMessage(Object message) throws IOException, EncodeException {
+         this.session.getBasicRemote().sendObject(message);
      }
 
 

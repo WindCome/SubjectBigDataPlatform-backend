@@ -3,6 +3,7 @@ package com.example.ggkgl.Service;
 import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Component.ExportHandlerFactory;
 import com.example.ggkgl.Component.IExport;
+import com.example.ggkgl.Model.ExportInfo;
 import net.sf.json.JSONObject;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Service;
@@ -30,16 +31,17 @@ public class DataTransmissionService {
      * @param callBack  导出进度回调
      * @return  导出结果信息
      */
-    HashMap<String,Object> export(String target, int tableId,JSONObject params, ProcessCallBack callBack){
+    public ExportInfo export(String target, int tableId, JSONObject params, ProcessCallBack callBack) throws Exception {
         List<HashMap> data = dataManagerService.conditionSearch(null,tableId,-1,-1);
         IExport exportHandler = exportHandlerFactory.getExportHandler(target);
         if(exportHandler == null){
+            final String errorInfo = "找不到合适的数据导出器";
             if(callBack != null){
-                callBack.log("找不到合适的数据导出器");
+                callBack.log(errorInfo);
                 callBack.processFinished();
             }
-            this.logger.info("找不到合适的数据导出器");
-            return new HashMap<>(0);
+            this.logger.info(errorInfo);
+            return new ExportInfo();
         }
         return exportHandler.export(data, params,callBack);
     }
