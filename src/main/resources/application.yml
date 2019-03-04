@@ -19,6 +19,9 @@ spring:
     timeout: 5000s
   cache:
     type: redis
+  activemq:
+    packages:
+      trust-all: true
 
 server:
   port: 8081

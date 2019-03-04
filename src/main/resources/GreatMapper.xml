@@ -39,11 +39,12 @@
     </select>
 
     <select id="comboSearch" statementType="STATEMENT" resultType="HashMap">
-        select * from ${tableName} where
-            <foreach collection="conditions" separator="and" item="condition" index="index">
-                ${condition.key} like '%${condition.value}%'
-            </foreach>
-            <if test="start >=0 and length >=0">limit ${start} ,${length}</if>
+        select * from ${tableName}
+        <if test="conditions != null and conditions.size() != 0">where</if>
+        <foreach collection="conditions" separator="and" item="condition" index="index">
+            ${condition.key} like '%${condition.value}%'
+        </foreach>
+        <if test="start >=0 and length >=0">limit ${start} ,${length}</if>
     </select>
 
     <select id="comboCount" statementType="STATEMENT" resultType="long">
@@ -92,6 +93,6 @@
     </select>
 
     <select id="findColumnName" statementType="STATEMENT" resultType="String">
-        select DISTINCT COLUMN_NAME from information_schema.columns where table_name='${tableName}';
+        select DISTINCT(COLUMN_NAME) from information_schema.columns where table_name='${tableName}';
     </select>
 </mapper>
