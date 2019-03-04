@@ -6,7 +6,6 @@ import javax.validation.constraints.NotNull;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
 * 线程管理
@@ -17,30 +16,42 @@ public class ThreadManagerService {
 
     private ConcurrentHashMap<Long,Future> futureMap = new ConcurrentHashMap<>();
 
-    private AtomicLong currentJobId = new AtomicLong(1);
-
     public Long executeThread(@NotNull Runnable runnable){
-        long jobId = this.currentJobId.getAndIncrement();
-        if(runnable instanceof Future){
-            this.futureMap.put(jobId,(Future)runnable);
-        }
-        Thread thread = new Thread(runnable);
-        thread.start();
-        this.threads.put(jobId,thread);
-        return jobId;
+        long threadId = this.submitThread(runnable);
+        return this.executeThread(threadId);
     }
 
-    public Boolean isThreadTerminated(Long jobId) {
-        if(this.threads.containsKey(jobId)){
-            return this.threads.get(jobId).getState() == Thread.State.TERMINATED;
+    public Long executeThread(long threadId){
+        Thread thread = this.getThreadById(threadId);
+        thread.start();
+        return thread.getId();
+    }
+
+    public Long submitThread(@NotNull Runnable runnable){
+        Thread thread = new Thread(runnable);
+        long threadId = thread.getId();
+        if(runnable instanceof Future){
+            this.futureMap.put(threadId,(Future)runnable);
+        }
+        this.threads.put(threadId,thread);
+        return thread.getId();
+    }
+
+    public Thread getThreadById(long threadId){
+        return this.threads.getOrDefault(threadId,null);
+    }
+
+    public Boolean isThreadTerminated(long threadId) {
+        if(this.threads.containsKey(threadId)){
+            return this.threads.get(threadId).getState() == Thread.State.TERMINATED;
         }
         return null;
     }
 
-    public Object getThreadResult(Long jobId){
-        if(this.futureMap.containsKey(jobId) && this.futureMap.get(jobId).isDone()){
+    public Object getThreadResult(long threadId){
+        if(this.futureMap.containsKey(threadId) && this.futureMap.get(threadId).isDone()){
             try {
-                return this.futureMap.get(jobId).get();
+                return this.futureMap.get(threadId).get();
             }
             catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
@@ -49,11 +60,11 @@ public class ThreadManagerService {
         return null;
     }
 
-    public void terminateThread(Long jobId){
-        if(this.threads.containsKey(jobId)){
-            Thread thread = this.threads.get(jobId);
+    public void terminateThread(long threadId){
+        if(this.threads.containsKey(threadId)){
+            Thread thread = this.threads.get(threadId);
             if(!thread.isInterrupted()){
-                this.threads.get(jobId).interrupt();
+                this.threads.get(threadId).interrupt();
             }
         }
     }

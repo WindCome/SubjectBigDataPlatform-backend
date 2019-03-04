@@ -2,14 +2,21 @@ package com.example.ggkgl.Controller;
 
 import com.example.ggkgl.AssitClass.ExceptionHelper;
 import com.example.ggkgl.AssitClass.JSONHelper;
+import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Mapper.GreatMapper;
-import com.example.ggkgl.Service.DataManagerService;
-import com.example.ggkgl.Service.TableConfigService;
+import com.example.ggkgl.Model.ExportInfo;
+import com.example.ggkgl.Service.*;
+import javafx.util.Pair;
 import net.sf.json.JSONObject;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jms.core.JmsMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.naming.OperationNotSupportedException;
 import javax.servlet.http.HttpServletRequest;
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 
 
@@ -29,6 +36,19 @@ public class AllController {
 
     @Resource
     private TableConfigService tableConfigService;
+
+    @Resource
+    private DataTransmissionService dataTransmissionService;
+
+    @Resource
+    private JmsMessagingTemplate jmsMessagingTemplate;
+
+    @Resource
+    private ThreadManagerService threadManagerService;
+
+    @Resource
+    private ResourceService resourceService;
+
 
     /**
      * 获取所有公共库的列表
@@ -211,6 +231,64 @@ public class AllController {
         hashMap.put("totalSize",this.dataManagerService.conditionCount(jsonObject,tableId));
         searchMaps.add(hashMap);
         return searchMaps;
+    }
+
+    @PostMapping(value = "/export/{tableId}")
+    public ExportInfo export(@PathVariable int tableId,@RequestParam String target,@RequestBody(required = false) JSONObject params) throws Exception {
+        if(params == null){
+            params = new JSONObject();
+        }
+        params.put("start",false);
+        String[] columns = this.tableConfigService.getColumnNamesOfTable(tableId);
+        params.put("headers",Arrays.asList(columns));
+        return dataTransmissionService.export(target, tableId, params, new ProcessCallBack() {
+            private long id;
+
+            @Override
+            public void onProcessChange(int currentProcess) {
+                jmsMessagingTemplate.convertAndSend("progress_object",
+                        this.generateMsg(id,currentProcess,null,null));
+            }
+            @Override
+            public void setProgressId(long progressId) {
+                id = progressId;
+            }
+            @Override
+            public void log(String message) {
+                jmsMessagingTemplate.convertAndSend("progress_object",
+                        this.generateMsg(id,null,null,message));
+            }
+            @Override
+            public void processFinished(Object result) {
+                jmsMessagingTemplate.convertAndSend("progress_object",
+                        this.generateMsg(id,101,result,null));
+            }
+
+            private HashMap<String,Object> generateMsg(long jobId,Integer progress,Object result,String log){
+                HashMap<String,Object> msg = new HashMap<>(4);
+                msg.put("jobId",jobId);
+                if(progress!=null){
+                    msg.put("progress",progress);
+                }
+                if(result !=null){
+                    msg.put("result",result);
+                }
+                if(log !=null){
+                    msg.put("log",log);
+                }
+                return msg;
+            }
+        });
+    }
+
+    @GetMapping(value = "/job/result/{jobId}")
+    public Object getJobResult(@PathVariable long jobId){
+        return this.threadManagerService.getThreadResult(jobId);
+    }
+
+    @GetMapping(value = "/download")
+    public ResponseEntity<FileSystemResource> downloadResource(@RequestParam String fileName) throws UnsupportedEncodingException, OperationNotSupportedException {
+        return resourceService.download(fileName);
     }
 
 }

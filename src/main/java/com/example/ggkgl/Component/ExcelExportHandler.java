@@ -27,10 +27,18 @@ public class ExcelExportHandler implements IExport{
     @Override
     @SuppressWarnings("unchecked")
     public ExportInfo export(List<HashMap> data, JSONObject params, ProcessCallBack callBack){
-        Callable<String> callable = () ->
-                ExcelExportHandler.this.nonAsyExcelExportHandler.export(data,params,callBack).getValue().toString();
-        FutureTask<String> futureTask = new FutureTask<>(callable);
-        long jobId = this.threadManagerService.executeThread(futureTask);
+        Callable<String> callable = () -> ExcelExportHandler.this.nonAsyExcelExportHandler.export(data,params,callBack).getValue().toString();
+                FutureTask<String> futureTask = new FutureTask<>(callable);
+        final String startThreadAtOnceParam = "start";
+        long jobId;
+        if(!params.containsKey(startThreadAtOnceParam) || params.get(startThreadAtOnceParam).equals(true)){
+            jobId = this.threadManagerService.executeThread(futureTask);
+        }else {
+            jobId = this.threadManagerService.submitThread(futureTask);
+        }
+        if(callBack != null){
+            callBack.setProgressId(jobId);
+        }
         return new ExportInfo(ExportInfo.JOB,jobId);
     }
 

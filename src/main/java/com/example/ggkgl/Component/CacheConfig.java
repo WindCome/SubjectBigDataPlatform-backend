@@ -32,7 +32,7 @@ public class CacheConfig extends CachingConfigurerSupport {
         /* 配置tableConfigService的超时时间为30min*/
         return RedisCacheManager.builder(RedisCacheWriter.lockingRedisCacheWriter
                 (connectionFactory)).cacheDefaults(defaultCacheConfig).withInitialCacheConfigurations(Collections.singletonMap
-                ("test", RedisCacheConfiguration.defaultCacheConfig().entryTtl(Duration.ofMinutes(30L))
+                ("tableConfigService", RedisCacheConfiguration.defaultCacheConfig().entryTtl(Duration.ofMinutes(30L))
                         .disableCachingNullValues())).transactionAware().build();
     }
 }

@@ -35,12 +35,7 @@ public class DataTransmissionService {
         List<HashMap> data = dataManagerService.conditionSearch(null,tableId,-1,-1);
         IExport exportHandler = exportHandlerFactory.getExportHandler(target);
         if(exportHandler == null){
-            final String errorInfo = "找不到合适的数据导出器";
-            if(callBack != null){
-                callBack.log(errorInfo);
-                callBack.processFinished();
-            }
-            this.logger.info(errorInfo);
+            this.logger.info("找不到合适的数据导出器");
             return new ExportInfo();
         }
         return exportHandler.export(data, params,callBack);
