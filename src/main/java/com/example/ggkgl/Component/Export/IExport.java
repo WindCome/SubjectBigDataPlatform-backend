@@ -1,7 +1,7 @@
-package com.example.ggkgl.Component;
+package com.example.ggkgl.Component.Export;
 
 import com.example.ggkgl.AssitClass.ProcessCallBack;
-import com.example.ggkgl.Model.ExportInfo;
+import com.example.ggkgl.Model.JobInfo;
 import net.sf.json.JSONObject;
 
 import java.util.HashMap;
@@ -17,7 +17,7 @@ public interface IExport {
      * @param callBack  导出进度回调
      * @return  导出结果信息
      */
-    ExportInfo export(List<HashMap> data, JSONObject params, ProcessCallBack callBack) throws Exception;
+    JobInfo export(List<HashMap> data, JSONObject params, ProcessCallBack callBack) throws Exception;
 
     /**
      * @return 该导出器导出的目标类型(excel、mysql等)

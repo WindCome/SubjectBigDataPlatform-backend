@@ -1,14 +1,16 @@
 package com.example.ggkgl.Service;
 
 import com.example.ggkgl.AssitClass.ProcessCallBack;
-import com.example.ggkgl.Component.ExportHandlerFactory;
-import com.example.ggkgl.Component.IExport;
-import com.example.ggkgl.Model.ExportInfo;
+import com.example.ggkgl.Component.HandlerFactory;
+import com.example.ggkgl.Component.Export.IExport;
+import com.example.ggkgl.Component.Import.IImport;
+import com.example.ggkgl.Model.JobInfo;
 import net.sf.json.JSONObject;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -23,7 +25,10 @@ public class DataTransmissionService {
     private DataManagerService dataManagerService;
 
     @Resource
-    private ExportHandlerFactory exportHandlerFactory;
+    private HandlerFactory handlerFactory;
+
+    @Resource
+    private ThreadManagerService threadManagerService;
 
     /**
      * @param target 导出目的类型("excel"、"mysql"等)
@@ -31,13 +36,60 @@ public class DataTransmissionService {
      * @param callBack  导出进度回调
      * @return  导出结果信息
      */
-    public ExportInfo export(String target, int tableId, JSONObject params, ProcessCallBack callBack) throws Exception {
+    public JobInfo export(String target, int tableId, JSONObject params, ProcessCallBack callBack) throws Exception {
         List<HashMap> data = dataManagerService.conditionSearch(null,tableId,-1,-1);
-        IExport exportHandler = exportHandlerFactory.getExportHandler(target);
+        IExport exportHandler = handlerFactory.getExportHandler(target);
         if(exportHandler == null){
             this.logger.info("找不到合适的数据导出器");
-            return new ExportInfo();
+            return new JobInfo();
         }
         return exportHandler.export(data, params,callBack);
+    }
+
+    /**
+     * @param fromType 导入来源(excel、mysql等)
+     * @param params   导入参数 {"tableId":Integer (目的mysql表),
+     *                 "start": Boolean (是否立刻启动任务，缺省时代表立即启动),...(其他导出器必要参数)}
+     * @param callBack 进度回调
+     * @return  导出任务信息
+     */
+    public JobInfo importData(String fromType,JSONObject params,ProcessCallBack callBack){
+        IImport importHandler = handlerFactory.getImportHandler(fromType);
+        if(importHandler == null){
+            this.logger.info("找不到合适的数据导入器");
+            return new JobInfo();
+        }
+        int tableId = (int)params.get("tableId");
+        Thread thread = new Thread(() -> {
+            try {
+                List<HashMap> dataList = importHandler.importData(params,callBack);
+                List<HashMap> opMapList = new ArrayList<>(dataList.size());
+                for(HashMap data:dataList){
+                    HashMap<String,Object> opMap = new HashMap<>(2);
+                    opMap.put("op", DataManagerService.OperatorCode.NEW);
+                    opMap.put("value",data);
+                    opMapList.add(opMap);
+                }
+                dataManagerService.mysqlDataRetention(tableId,opMapList,callBack,true);
+                if(callBack != null){
+                    callBack.processFinished(null);
+                }
+            }
+            catch (Exception e) {
+                if(callBack != null){
+                    callBack.log(e.getMessage());
+                    callBack.processFinished(null);
+                }
+                e.printStackTrace();
+            }
+        });
+        final String startThreadAtOnceParam = "start";
+        long jobId;
+        if(!params.containsKey(startThreadAtOnceParam) || params.get(startThreadAtOnceParam).equals(true)){
+            jobId = this.threadManagerService.executeThread(thread);
+        }else {
+            jobId = this.threadManagerService.submitThread(thread);
+        }
+        return new JobInfo(JobInfo.JOB,jobId);
     }
 }

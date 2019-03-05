@@ -3,9 +3,9 @@ package com.example.ggkgl.Model;
 import java.io.Serializable;
 
 /**
- * 导出信息
+ * 任务信息
  **/
-public class ExportInfo implements Serializable{
+public class JobInfo implements Serializable{
     public static final String REDIS="REDIS";
 
     public static final String JOB = "JOB";
@@ -16,10 +16,10 @@ public class ExportInfo implements Serializable{
 
     private Object value;
 
-    public ExportInfo() {
+    public JobInfo() {
     }
 
-    public ExportInfo(String targetType, Object value) {
+    public JobInfo(String targetType, Object value) {
         this.targetType = targetType;
         this.value = value;
     }

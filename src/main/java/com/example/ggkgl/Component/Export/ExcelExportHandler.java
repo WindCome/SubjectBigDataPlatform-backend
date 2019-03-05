@@ -1,7 +1,7 @@
-package com.example.ggkgl.Component;
+package com.example.ggkgl.Component.Export;
 
 import com.example.ggkgl.AssitClass.ProcessCallBack;
-import com.example.ggkgl.Model.ExportInfo;
+import com.example.ggkgl.Model.JobInfo;
 import com.example.ggkgl.Service.ThreadManagerService;
 import net.sf.json.JSONObject;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import java.util.concurrent.FutureTask;
 * excel异步数据导出处理器
  **/
 @Component
-public class ExcelExportHandler implements IExport{
+public class ExcelExportHandler implements IExport {
 
     @Resource
     private ThreadManagerService threadManagerService;
@@ -26,7 +26,7 @@ public class ExcelExportHandler implements IExport{
 
     @Override
     @SuppressWarnings("unchecked")
-    public ExportInfo export(List<HashMap> data, JSONObject params, ProcessCallBack callBack){
+    public JobInfo export(List<HashMap> data, JSONObject params, ProcessCallBack callBack){
         Callable<String> callable = () -> ExcelExportHandler.this.nonAsyExcelExportHandler.export(data,params,callBack).getValue().toString();
                 FutureTask<String> futureTask = new FutureTask<>(callable);
         final String startThreadAtOnceParam = "start";
@@ -39,7 +39,7 @@ public class ExcelExportHandler implements IExport{
         if(callBack != null){
             callBack.setProgressId(jobId);
         }
-        return new ExportInfo(ExportInfo.JOB,jobId);
+        return new JobInfo(JobInfo.JOB,jobId);
     }
 
     @Override

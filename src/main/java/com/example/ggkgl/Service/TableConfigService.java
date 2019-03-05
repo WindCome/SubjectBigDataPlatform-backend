@@ -64,7 +64,6 @@ public class TableConfigService {
      */
     @Cacheable(value = "tableConfigService", key="#tableId + 'getColumnNamesOfTable'")
     public String[] getColumnNamesOfTable(int tableId){
-        System.out.println("=====in=====");
         String[] columnNames = this.greatMapper.findColumnName(this.getTableNameById(tableId));
         if(columnNames == null ){
             return new String[0];

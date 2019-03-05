@@ -1,16 +1,18 @@
 package com.example.ggkgl.Controller;
 
 import com.example.ggkgl.AssitClass.ExceptionHelper;
+import com.example.ggkgl.AssitClass.FileHelper;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Mapper.GreatMapper;
-import com.example.ggkgl.Model.ExportInfo;
+import com.example.ggkgl.Model.JobInfo;
 import com.example.ggkgl.Service.*;
 import net.sf.json.JSONObject;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jms.core.JmsMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.naming.OperationNotSupportedException;
@@ -47,7 +49,6 @@ public class AllController {
 
     @Resource
     private ResourceService resourceService;
-
 
     /**
      * 获取所有公共库的列表
@@ -233,14 +234,33 @@ public class AllController {
     }
 
     @PostMapping(value = "/export/{tableId}")
-    public ExportInfo export(@PathVariable int tableId,@RequestParam String target,@RequestBody(required = false) JSONObject params) throws Exception {
+    public JobInfo export(@PathVariable int tableId, @RequestParam String target, @RequestBody(required = false) JSONObject params) throws Exception {
         if(params == null){
             params = new JSONObject();
         }
         params.put("start",false);
         String[] columns = this.tableConfigService.getColumnNamesOfTable(tableId);
         params.put("headers",Arrays.asList(columns));
-        return dataTransmissionService.export(target, tableId, params, new ProcessCallBack() {
+        return dataTransmissionService.export(target, tableId, params,this.generateProgressCallBack());
+    }
+
+    @PostMapping(value = "/import/{tableId}/from/{type}")
+    public JobInfo importData(@PathVariable int tableId,@PathVariable String type,@RequestBody JSONObject params) throws Exception {
+        switch (type){
+            case "excel":
+                String fileName = this.uploadResource(params.getString("file"));
+                params.put("file",fileName);
+            break;
+            default:
+            break;
+        }
+        params.put("start",false);
+        params.put("tableId",tableId);
+        return dataTransmissionService.importData(type, params, this.generateProgressCallBack());
+    }
+
+    private ProcessCallBack generateProgressCallBack(){
+        return new ProcessCallBack() {
             private long id;
 
             @Override
@@ -277,7 +297,7 @@ public class AllController {
                 }
                 return msg;
             }
-        });
+        };
     }
 
     @GetMapping(value = "/job/result/{jobId}")
@@ -288,6 +308,16 @@ public class AllController {
     @GetMapping(value = "/download")
     public ResponseEntity<FileSystemResource> downloadResource(@RequestParam String fileName) throws UnsupportedEncodingException, OperationNotSupportedException {
         return resourceService.download(fileName);
+    }
+
+    /**
+     * @param fileBase64Format 使用BASE63编码的字符串
+     * @return 系统存放该文件的文件名
+     */
+    @PostMapping(value = "/upload")
+    public String uploadResource(@RequestBody String fileBase64Format) throws Exception {
+        MultipartFile file = FileHelper.Base64ToMultipartFile(fileBase64Format);
+        return resourceService.uploadFile(file);
     }
 
 }

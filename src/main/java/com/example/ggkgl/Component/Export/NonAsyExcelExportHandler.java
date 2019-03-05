@@ -1,7 +1,7 @@
-package com.example.ggkgl.Component;
+package com.example.ggkgl.Component.Export;
 
 import com.example.ggkgl.AssitClass.ProcessCallBack;
-import com.example.ggkgl.Model.ExportInfo;
+import com.example.ggkgl.Model.JobInfo;
 import com.example.ggkgl.Service.ResourceService;
 import net.sf.json.JSONObject;
 import org.apache.commons.lang.RandomStringUtils;
@@ -24,7 +24,7 @@ import java.util.List;
 * 非异步Excel导出器
  **/
 @Component
-public class NonAsyExcelExportHandler implements IExport{
+public class NonAsyExcelExportHandler implements IExport {
     private Logger logger = Logger.getLogger(NonAsyExcelExportHandler.class);
 
     /**
@@ -35,7 +35,7 @@ public class NonAsyExcelExportHandler implements IExport{
      */
     @Override
     @SuppressWarnings("unchecked")
-    public ExportInfo export(List<HashMap> data, JSONObject params, ProcessCallBack callBack) throws Exception {
+    public JobInfo export(List<HashMap> data, JSONObject params, ProcessCallBack callBack) throws Exception {
         if(CollectionUtils.isEmpty(data)){
             throw new Exception("excel导出数据为空");
         }
@@ -119,7 +119,7 @@ public class NonAsyExcelExportHandler implements IExport{
                     callBack.processFinished(null);
                 }
             }
-            return new ExportInfo(ExportInfo.FILE,storagePath);
+            return new JobInfo(JobInfo.FILE,storagePath);
         }
         catch (Exception e){
             e.printStackTrace();
@@ -127,7 +127,7 @@ public class NonAsyExcelExportHandler implements IExport{
             if(callBack != null){
                 callBack.log("导出过程中发生错误");
             }
-            return new ExportInfo();
+            return new JobInfo();
         }
 
     }
