@@ -9,24 +9,25 @@ import java.io.Serializable;
 import java.util.HashMap;
 
 /**
-* 用于记录修改爬虫数据的信息
+* 用于记录修改redis数据的信息
  **/
 @RedisHash("spider_change")
-public class SpiderDataChangeEntity implements Serializable{
+public class RedisDataChangeEntity implements Serializable{
     @Id
     @GeneratedValue
     private Long id;
+
     /**
-     * 变更的数据在爬虫数据列表中的下标
+     * 数据存放在redis中的键值
+     */
+    @Indexed
+    private String redisKey;
+
+    /**
+     * 变更的数据在redis数据列表中的下标
      */
     @Indexed
     private Integer index;
-
-    /**
-     * mysql表id
-     */
-    @Indexed
-    private int tableId;
 
     /**
      * 变更的数据作于在Mysql中的数据的主键值
@@ -46,14 +47,6 @@ public class SpiderDataChangeEntity implements Serializable{
 
     public void setIndex(Integer index) {
         this.index = index;
-    }
-
-    public int getTableId() {
-        return tableId;
-    }
-
-    public void setTableId(int tableId) {
-        this.tableId = tableId;
     }
 
     public Object getPrimaryValue() {
@@ -82,5 +75,13 @@ public class SpiderDataChangeEntity implements Serializable{
 
     public void setDelete(boolean delete) {
         isDelete = delete;
+    }
+
+    public String getRedisKey() {
+        return redisKey;
+    }
+
+    public void setRedisKey(String redisKey) {
+        this.redisKey = redisKey;
     }
 }

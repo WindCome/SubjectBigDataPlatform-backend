@@ -32,7 +32,7 @@ public class UpdateController {
     private TableConfigService tableConfigService;
 
     @Resource
-    private SpiderDataManagerService spiderDataManagerService;
+    private RedisDataManagerService redisDataManagerService;
 
     @Autowired
     public UpdateController(SpiderService spiderService, RedisVersionControlService redisVersionControlService) {
@@ -66,8 +66,9 @@ public class UpdateController {
     @GetMapping(value = "/version/{version}/index/{tableId}")
     public List<Pair> getIndexChangeList(@PathVariable("tableId") int tableId,
                                      @PathVariable(value = "version") String version) {
-        String currentVersion = this.redisVersionControlService.getCurrentVersion(tableId);
-        return this.redisVersionControlService.getIndexChangeDetail(tableId,version,currentVersion);
+        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        String currentVersion = this.redisVersionControlService.getCurrentVersion(redisKey);
+        return this.redisVersionControlService.getIndexChangeDetail(redisKey,version,currentVersion);
     }
 
     /**
@@ -84,9 +85,10 @@ public class UpdateController {
     public Pair<String,String> updateSpiderData(@PathVariable("tableId") int tableId,@RequestParam int index,
                                                 @RequestBody JSONObject jsonObject)
     {
-        jsonObject.put("op", SpiderDataManagerService.OperatorCode.UPDATE);
+        jsonObject.put("op", RedisDataManagerService.OperatorCode.UPDATE);
         jsonObject.put("index",index);
-        return this.redisVersionControlService.recordModifySpiderData(tableId,JSONHelper.json2Map(jsonObject));
+        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        return this.redisVersionControlService.recordModifyRedisData(redisKey,JSONHelper.json2Map(jsonObject));
     }
 
     /**
@@ -101,11 +103,12 @@ public class UpdateController {
     public Pair<String,String> resetSpiderData(@PathVariable("tableId") int tableId,@RequestParam("index") int index)
     {
         HashMap params = new HashMap(2);
-        params.put("op", SpiderDataManagerService.OperatorCode.RESET);
+        params.put("op", RedisDataManagerService.OperatorCode.RESET);
         params.put("index",index);
-        Pair<String,String> result = this.redisVersionControlService.recordModifySpiderData(tableId,params);
+        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        Pair<String,String> result = this.redisVersionControlService.recordModifyRedisData(redisKey,params);
         if(result.getKey().equals("success")){
-            HashMap contrastResult = this.spiderDataManagerService.getContrastResult(tableId,index);
+            HashMap contrastResult = this.redisDataManagerService.getContrastResult(redisKey,index);
             result = new Pair<>("success",JSONHelper.map2Json(contrastResult));
         }
         return result;
@@ -122,9 +125,10 @@ public class UpdateController {
     public Pair<String,String> deleteSpiderData(@PathVariable("tableId") int tableId,@RequestParam("index") int index)
     {
         HashMap params = new HashMap(2);
-        params.put("op", SpiderDataManagerService.OperatorCode.DELETE);
+        params.put("op", RedisDataManagerService.OperatorCode.DELETE);
         params.put("index",index);
-        return this.redisVersionControlService.recordModifySpiderData(tableId,params);
+        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        return this.redisVersionControlService.recordModifyRedisData(redisKey,params);
     }
 
     /**
@@ -150,7 +154,8 @@ public class UpdateController {
     public boolean saveRedisData(@PathVariable("tableId") int tableId,@RequestBody List<Integer> indexList,ProcessCallBack processCallBack)
     {
         if(indexList == null){
-            int size = this.spiderDataManagerService.getSizeOfData(tableId);
+            String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+            int size = this.redisDataManagerService.getSizeOfData(redisKey);
             indexList = IntStream.iterate(0, n -> n + 1).limit(size).boxed().collect(Collectors.toList());
         }else if(indexList.size() == 0){
             return true;
@@ -158,7 +163,8 @@ public class UpdateController {
         String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
         List<HashMap> data = new ArrayList<>(indexList.size());
         for(int i : indexList){
-            HashMap<String,Object> contrastResult = this.spiderDataManagerService.getContrastResult(tableId,i);
+            String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+            HashMap<String,Object> contrastResult = this.redisDataManagerService.getContrastResult(redisKey,i);
             String status = contrastResult.get("status").toString();
             HashMap<String,Object> opMap = new HashMap<>(3);
             if(status.equals("new")){
@@ -193,18 +199,20 @@ public class UpdateController {
         return this.spiderService.execCrawl(spiderPath, command,
                 new SpiderService.CrawlCallBack(){
             private Object dataDump = null;
+            private String redisKey;
             @Override
             public void onStart() {
-                this.dataDump = UpdateController.this.spiderDataManagerService.getJsonDataFromSpider(tableId);
+                redisKey = UpdateController.this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+                this.dataDump = UpdateController.this.redisDataManagerService.getJsonDataList(redisKey);
             }
             @Override
             public void onFinished() {
-                String oldVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(tableId);
-                UpdateController.this.redisVersionControlService.contrast(tableId,dataDump,
-                        UpdateController.this.spiderDataManagerService.getJsonDataFromSpider(tableId));
-                String currentVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(tableId);
-                List<Pair> changeList = UpdateController.this.redisVersionControlService.getIndexChangeDetail(tableId,oldVersion,currentVersion);
-                UpdateController.this.redisVersionControlService.resetIndex(tableId, changeList);
+                String oldVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
+                UpdateController.this.redisVersionControlService.contrast(redisKey,dataDump,
+                        UpdateController.this.redisDataManagerService.getJsonDataList(redisKey));
+                String currentVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
+                List<Pair> changeList = UpdateController.this.redisVersionControlService.getIndexChangeDetail(redisKey,oldVersion,currentVersion);
+                UpdateController.this.redisVersionControlService.resetIndex(redisKey, changeList);
             }
         });
     }
@@ -236,19 +244,20 @@ public class UpdateController {
                                    @RequestParam(value = "page",defaultValue = "1") int page,
                                    @RequestParam(value = "size",defaultValue = "20") int size)
     {
-        String currentVersion = this.redisVersionControlService.getCurrentVersion(tableId);
+        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        String currentVersion = this.redisVersionControlService.getCurrentVersion(redisKey);
         int updateCount=0;
         int newCount=0;
         int sameCount=0;
         int deleteCount = 0;
         String targetType = (String)jsonObject.getOrDefault("status","all");
         HashMap condition = JSONHelper.jsonStr2Map(jsonObject.getOrDefault("condition","").toString());
-        int dataSize =  this.spiderDataManagerService.getSizeOfData(tableId);
+        int dataSize =  this.redisDataManagerService.getSizeOfData(redisKey);
         List<HashMap> contrastResultList = new ArrayList<>(dataSize);
         int startIndex = (page - 1) * size;
         int coincidentIndex = 0;
         for (int i = 0 ; i < dataSize ; i++){
-            HashMap contrastResult = this.spiderDataManagerService.getContrastResult(tableId,i);
+            HashMap contrastResult = this.redisDataManagerService.getContrastResult(redisKey,i);
             if(contrastResult == null){
                 //爬虫数据有删除操作
                 continue;

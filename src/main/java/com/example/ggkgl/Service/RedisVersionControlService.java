@@ -3,8 +3,8 @@ package com.example.ggkgl.Service;
 import com.example.ggkgl.AssitClass.ExceptionHelper;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Component.SpringUtil;
-import com.example.ggkgl.Mapper.SpiderDataChangeRepository;
-import com.example.ggkgl.Model.SpiderDataChangeEntity;
+import com.example.ggkgl.Mapper.RedisDataChangeRepository;
+import com.example.ggkgl.Model.RedisDataChangeEntity;
 import javafx.util.Pair;
 import net.sf.json.JSONObject;
 import org.apache.commons.lang.RandomStringUtils;
@@ -22,7 +22,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @Service
 public class RedisVersionControlService {
     @Resource
-    private SpiderDataChangeRepository spiderDataChangeRepository;
+    private RedisDataChangeRepository redisDataChangeRepository;
     /**
      * 当数据版本变更导致调用resetIndex使记录对应下标发生改变时获取写锁,修改记录时获取读锁
      * 目的是使可以多个线程同时修改记录，但在同一时间只有一个线程对下标进行修改，
@@ -31,52 +31,52 @@ public class RedisVersionControlService {
     private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
 
     /**
-     * @param tableId 表的Id（即保存在mysql表META_ENTITY中的自增字段）
+     * @param redisKey redis键
      * @return redis中用于更新目的mysql表的数据版本号
      */
-    public String getCurrentVersion(int tableId){
+    public String getCurrentVersion(String redisKey){
         Jedis jedis = new Jedis();
-        String versionCode = jedis.get("version"+tableId);
+        String versionCode = jedis.get("version"+redisKey);
         if(versionCode == null){
-            versionCode = this.setCurrentVersion(tableId);
+            versionCode = this.setCurrentVersion(redisKey);
         }
         return versionCode;
     }
 
     /**
-     * @param tableId 表的Id（即保存在mysql表META_ENTITY中的自增字段）
+     * @param redisKey redis键
      * @param originalData 原本的数据
      * @param currentData 新的数据
      * @return 版本是否发生了变化
      */
-    @CacheEvict(value = "SpiderContrastResult",allEntries = true,condition = "#result")
-    public boolean contrast(int tableId, Object originalData, Object currentData){
+    @CacheEvict(value = "RedisContrastResult",allEntries = true,condition = "#result&&originalData!=null")
+    public boolean contrast(String redisKey, Object originalData, Object currentData){
         boolean changed = (originalData == null && currentData!=null) ||
                 (originalData != null && (currentData == null || !originalData.equals(currentData)));
         if(changed){
-            String originalVersion = getCurrentVersion(tableId);
-            String currentVersion = setCurrentVersion(tableId);
+            String originalVersion = getCurrentVersion(redisKey);
+            String currentVersion = setCurrentVersion(redisKey);
             if(originalData!=null && currentData!=null){
                 List<Pair> detail = this.generateIndexChangeDetail(JSONHelper.jsonStr2MapList(originalData.toString())
                         ,JSONHelper.jsonStr2MapList(currentData.toString()));
-                this.saveIndexChange(tableId,originalVersion,currentVersion,detail);
+                this.saveIndexChange(redisKey,originalVersion,currentVersion,detail);
             }
         }
         return changed;
     }
 
-    private void saveIndexChange(int tableId,String fromVersion,String toVersion,List<Pair> detail){
+    private void saveIndexChange(String redisKey,String fromVersion,String toVersion,List<Pair> detail){
         Jedis jedis = new Jedis();
         Map<String,Object> data = new HashMap<>(2);
         data.put("versions",new Pair<>(fromVersion,toVersion));
         data.put("detail",detail);
-        jedis.set("version_change"+tableId, JSONObject.fromObject(data).toString());
+        jedis.set("version_change"+redisKey, JSONObject.fromObject(data).toString());
     }
 
     @SuppressWarnings("unchecked")
-    public List<Pair> getIndexChangeDetail(int tableId,String fromVersion,String toVersion){
+    public List<Pair> getIndexChangeDetail(String redisKey,String fromVersion,String toVersion){
         Jedis jedis = new Jedis();
-        Map<String,Object> data = JSONHelper.jsonStr2Map(jedis.get("version_change"+tableId));
+        Map<String,Object> data = JSONHelper.jsonStr2Map(jedis.get("version_change"+redisKey));
         JSONObject versionInfo = (JSONObject)data.get("versions");
         if (!versionInfo.getString("key").equals(fromVersion) || !versionInfo.getString("value").equals(toVersion)){
             return null;
@@ -103,26 +103,26 @@ public class RedisVersionControlService {
         return indexChange;
     }
 
-    private synchronized String setCurrentVersion(int tableId){
+    private synchronized String setCurrentVersion(String redisKey){
         Jedis jedis = new Jedis();
         String versionCode = RandomStringUtils.randomAlphanumeric(10);
-        jedis.set("version"+tableId, versionCode);
+        jedis.set("version"+redisKey, versionCode);
         return versionCode;
     }
 
     /**
-     * 记录爬虫修改情况
-     * @param tableId   mysql表id
+     * 记录redis修改情况
+     * @param redisKey  redis键
      * @param modifyInfo    修改信息,格式如下:
      *                          {"op":String ("DELETE"或"UPDATE",表示删除或修改),
      *                           "index":Integer (该数据在爬虫数据列表中的下标),
      *                           "id": Object (mysql记录的主键值，用于指明该爬虫信息用于更新哪条mysql记录),
      *                           "value":Map (爬虫数据修改后的值)
      *                          }
-     * @return  发生变化的爬虫数据下标
+     * @return  发生变化的redis数据下标
      */
     @SuppressWarnings("unchecked")
-    public Pair<String,String> recordModifySpiderData(int tableId, HashMap modifyInfo){
+    public Pair<String,String> recordModifyRedisData(String redisKey, HashMap modifyInfo){
         if(modifyInfo == null){
             return new Pair<>("fail","修改信息为空");
         }
@@ -132,7 +132,7 @@ public class RedisVersionControlService {
             int index = (int)modifyInfo.get("index");
             //直接调用会导致缓存清除失败
             RedisVersionControlService redisVersionControlService = SpringUtil.getBean(RedisVersionControlService.class);
-            redisVersionControlService.recordModifySpiderData(tableId,index,modifyInfo);
+            redisVersionControlService.recordModifyRedisData(redisKey,index,modifyInfo);
         }
         catch (Exception e){
             result = new Pair<>("fail",ExceptionHelper.getExceptionAllInfo(e));
@@ -144,27 +144,27 @@ public class RedisVersionControlService {
 
     /**
      * Warning!!!
-     * 不要在除recordModifySpiderData(int tableId, List<HashMap> modifyInfoList)这个方法外的其他地方调用这个函数
+     * 不要在除recordModifyRedisData(int tableId, List<HashMap> modifyInfoList)这个方法外的其他地方调用这个函数
      * 因为这个函数没有加锁，把它设置为public仅仅是因为缓存需要
      */
     @SuppressWarnings("unchecked")
-    @CacheEvict(value = "SpiderContrastResult",key = "#tableId+' '+#index",condition = "#result")
-    public boolean recordModifySpiderData(int tableId,int index,HashMap modifyInfo){
-        SpiderDataManagerService.OperatorCode op = SpiderDataManagerService.OperatorCode.valueOf(modifyInfo.get("op").toString());
+    @CacheEvict(value = "RedisContrastResult",key = "#redisKey+' '+#index",condition = "#result")
+    public boolean recordModifyRedisData(String redisKey, int index, HashMap modifyInfo){
+        RedisDataManagerService.OperatorCode op = RedisDataManagerService.OperatorCode.valueOf(modifyInfo.get("op").toString());
         boolean changed = false;
-        String watcher = tableId + "modify" + index;
+        String watcher = redisKey + "modify" + index;
         synchronized (watcher.intern()){
             switch (op){
                 case DELETE:
-                    this.deleteSpiderData(tableId, index);
+                    this.deleteRedisData(redisKey, index);
                     changed = true;
                     break;
                 case UPDATE:
-                    changed = this.updateSpiderData(tableId, index,
+                    changed = this.updateRedisData(redisKey, index,
                             modifyInfo.getOrDefault("id",null),(Map)modifyInfo.get("value"));
                     break;
                 case RESET:
-                    changed = this.resetSpiderData(tableId, index);
+                    changed = this.resetRedisData(redisKey, index);
                 default:
                     break;
             }
@@ -172,39 +172,39 @@ public class RedisVersionControlService {
         return changed;
     }
 
-    public SpiderDataChangeEntity getSpiderDataModifyInfo(int tableId, int index, boolean createIfAbsent){
-        SpiderDataChangeEntity spiderDataChangeEntity =
-                this.spiderDataChangeRepository.findByTableIdEqualsAndIndexEquals(tableId,index);
-        if(createIfAbsent && spiderDataChangeEntity == null){
-            spiderDataChangeEntity = new SpiderDataChangeEntity();
-            spiderDataChangeEntity.setTableId(tableId);
-            spiderDataChangeEntity.setIndex(index);
+    public RedisDataChangeEntity getRedisDataModifyInfo(String redisKey, int index, boolean createIfAbsent){
+        RedisDataChangeEntity redisDataChangeEntity =
+                this.redisDataChangeRepository.findByRedisKeyEqualsAndIndexEquals(redisKey,index);
+        if(createIfAbsent && redisDataChangeEntity == null){
+            redisDataChangeEntity = new RedisDataChangeEntity();
+            redisDataChangeEntity.setRedisKey(redisKey);
+            redisDataChangeEntity.setIndex(index);
         }
-        return spiderDataChangeEntity;
+        return redisDataChangeEntity;
     }
 
-    private boolean resetSpiderData(int tableId,int index){
-        SpiderDataChangeEntity spiderDataChangeEntity = this.getSpiderDataModifyInfo(tableId, index, false);
-        if(spiderDataChangeEntity == null || !spiderDataChangeEntity.isDelete()){
+    private boolean resetRedisData(String redisKey, int index){
+        RedisDataChangeEntity redisDataChangeEntity = this.getRedisDataModifyInfo(redisKey, index, false);
+        if(redisDataChangeEntity == null || !redisDataChangeEntity.isDelete()){
             return false;
         }
-        spiderDataChangeEntity.setDelete(false);
-        this.spiderDataChangeRepository.save(spiderDataChangeEntity);
+        redisDataChangeEntity.setDelete(false);
+        this.redisDataChangeRepository.save(redisDataChangeEntity);
         return true;
     }
 
-    private void deleteSpiderData(int tableId,int index){
-        SpiderDataChangeEntity spiderDataChangeEntity = this.getSpiderDataModifyInfo(tableId, index,true);
-        spiderDataChangeEntity.setDelete(true);
-        this.spiderDataChangeRepository.save(spiderDataChangeEntity);
+    private void deleteRedisData(String redisKey, int index){
+        RedisDataChangeEntity redisDataChangeEntity = this.getRedisDataModifyInfo(redisKey, index,true);
+        redisDataChangeEntity.setDelete(true);
+        this.redisDataChangeRepository.save(redisDataChangeEntity);
     }
 
     @SuppressWarnings("unchecked")
-    private boolean updateSpiderData(int tableId, int index,Object newMysqlId ,Map newValue){
-        SpiderDataChangeEntity spiderDataChangeEntity = this.getSpiderDataModifyInfo(tableId, index,true);
+    private boolean updateRedisData(String redisKey, int index, Object newMysqlId , Map newValue){
+        RedisDataChangeEntity redisDataChangeEntity = this.getRedisDataModifyInfo(redisKey, index,true);
         boolean changed = false;
-        if(newMysqlId != null && !newMysqlId.equals(spiderDataChangeEntity.getPrimaryValue())){
-            spiderDataChangeEntity.setPrimaryValue(newMysqlId);
+        if(newMysqlId != null && !newMysqlId.equals(redisDataChangeEntity.getPrimaryValue())){
+            redisDataChangeEntity.setPrimaryValue(newMysqlId);
             changed = true;
         }
         if(newValue != null){
@@ -212,14 +212,14 @@ public class RedisVersionControlService {
             if(newValueField.containsKey("index")){
                 newValueField.remove("index");
             }
-            Map currentValue = spiderDataChangeEntity.getCurrentValue();
+            Map currentValue = redisDataChangeEntity.getCurrentValue();
             if(!newValueField.equals(currentValue)){
-                spiderDataChangeEntity.setCurrentValue(newValueField);
+                redisDataChangeEntity.setCurrentValue(newValueField);
                 changed = true;
             }
         }
         if(changed){
-            this.spiderDataChangeRepository.save(spiderDataChangeEntity);
+            this.redisDataChangeRepository.save(redisDataChangeEntity);
         }
         return changed;
     }
@@ -228,7 +228,7 @@ public class RedisVersionControlService {
      * 修改记录对应的数据下标变动
      * @return 失效的记录
      */
-    public List<Pair> resetIndex(int tableId,List<Pair> indexChangeDetails){
+    public List<Pair> resetIndex(String redisKey,List<Pair> indexChangeDetails){
         if(indexChangeDetails == null || indexChangeDetails.size() == 0){
             return new ArrayList<>(0);
         }
@@ -239,19 +239,19 @@ public class RedisVersionControlService {
             for(Pair change:indexChangeDetails){
                 int oldIndex = (int)change.getKey();
                 int newIndex = (int)change.getValue();
-                SpiderDataChangeEntity entity = this.getSpiderDataModifyInfo(tableId,oldIndex,false);
+                RedisDataChangeEntity entity = this.getRedisDataModifyInfo(redisKey,oldIndex,false);
                 if (entity == null){
                     invalidChange.add(change);
                 }else {
                     entity.setIndex(newIndex);
-                    this.spiderDataChangeRepository.save(entity);
+                    this.redisDataChangeRepository.save(entity);
                 }
                 indexToChange.add((Long)change.getKey());
             }
-            List<Long> historyList = this.spiderDataChangeRepository.findIdAll();
+            List<Long> historyList = this.redisDataChangeRepository.findIdAll();
             historyList.retainAll(indexToChange);
             for(Long id:historyList){
-                this.spiderDataChangeRepository.deleteById(id);
+                this.redisDataChangeRepository.deleteById(id);
             }
         }catch (Exception e){
             e.printStackTrace();
