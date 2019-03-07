@@ -68,7 +68,7 @@ public class ExcelImportHandler implements IImport{
                     finishNumber++;
                     if(callBack != null){
                         float process=(float)finishNumber/totalNumber;
-                        int percent=(int)Math.rint(process*50);//另一半在保存部分
+                        int percent=(int)Math.rint(process);
                         callBack.onProcessChange(percent);
                     }
                 }

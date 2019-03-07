@@ -170,8 +170,13 @@ public class MyWebSocket {
     @JmsListener(destination = "progress_object")
     public static void handelProgressMessage(HashMap<String,Object> msg) throws IOException, EncodeException {
         List<MyWebSocket> listeners = progressListener.getOrDefault(msg.get("jobId"),new ArrayList<>(0));
+        boolean nobodyListen = true;
         for(MyWebSocket socket:listeners){
+            nobodyListen = false;
             socket.sendMessage(JSONObject.fromObject(msg).toString());
+        }
+        if(nobodyListen){
+            System.out.println("无人监听任务"+msg.get("jobId"));
         }
     }
 

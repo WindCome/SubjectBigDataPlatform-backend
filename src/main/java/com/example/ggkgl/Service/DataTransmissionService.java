@@ -90,6 +90,9 @@ public class DataTransmissionService {
         }else {
             jobId = this.threadManagerService.submitThread(thread);
         }
+        if(callBack != null){
+            callBack.setProgressId(jobId);
+        }
         return new JobInfo(JobInfo.JOB,jobId);
     }
 }

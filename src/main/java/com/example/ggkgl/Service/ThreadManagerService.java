@@ -23,7 +23,9 @@ public class ThreadManagerService {
 
     public Long executeThread(long threadId){
         Thread thread = this.getThreadById(threadId);
-        thread.start();
+        if(thread.getState() == Thread.State.NEW){
+            thread.start();
+        }
         return thread.getId();
     }
 
