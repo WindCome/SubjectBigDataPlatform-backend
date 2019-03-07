@@ -248,13 +248,16 @@ public class AllController {
     public JobInfo importData(@PathVariable int tableId,@PathVariable String type,@RequestBody JSONObject params) throws Exception {
         switch (type){
             case "excel":
+                for(Object key:params.keySet()){
+                    System.out.println(params.get(key).toString());
+                }
+                //System.out.println(params.getString("file"));
                 String fileName = this.uploadResource(params.getString("file"));
                 params.put("file",fileName);
             break;
             default:
             break;
         }
-        params.put("start",false);
         params.put("tableId",tableId);
         return dataTransmissionService.importData(type, params, this.generateProgressCallBack());
     }

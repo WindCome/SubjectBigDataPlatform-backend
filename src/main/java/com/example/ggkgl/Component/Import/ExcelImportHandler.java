@@ -4,9 +4,10 @@ import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Service.ResourceService;
 import net.sf.json.JSONObject;
 import org.apache.log4j.Logger;
-import org.apache.poi.hssf.usermodel.HSSFRow;
-import org.apache.poi.hssf.usermodel.HSSFSheet;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Component;
 
 import javax.validation.constraints.NotNull;
@@ -39,28 +40,28 @@ public class ExcelImportHandler implements IImport{
         final String filePath = ResourceService.STORAGE_FILE_PATH + File.separator +params.get("file").toString();
         try(FileInputStream fileInputStream = new FileInputStream(filePath)){
             List<HashMap> result = new ArrayList<>();
-            HSSFWorkbook workbook = new HSSFWorkbook(fileInputStream);
+            Workbook workbook = WorkbookFactory.create(fileInputStream);
             final int sheetNumber = workbook.getNumberOfSheets();
             int totalNumber = sheetNumber;
             int finishNumber = 0;
             if(callBack != null){
                 //计算总数
                 for(int i=0;i<sheetNumber;i++){
-                    HSSFSheet sheet = workbook.getSheetAt(i);
+                    Sheet sheet = workbook.getSheetAt(i);
                     totalNumber += sheet.getLastRowNum()-sheet.getFirstRowNum();
                 }
             }
             for(int i=0;i<sheetNumber;i++){
-                HSSFSheet sheet = workbook.getSheetAt(i);
+                Sheet sheet = workbook.getSheetAt(i);
                 //默认第一行为表头
                 int firstRowIndex = sheet.getFirstRowNum();
                 int lastRowIndex = sheet.getLastRowNum();
                 HashMap<Integer,String> headerMap = this.getIndex2AttributeMap(sheet.getRow(firstRowIndex));
                 for(int j=firstRowIndex+1;j<=lastRowIndex;j++){
-                    HSSFRow dataRow = sheet.getRow(j);
+                    Row dataRow = sheet.getRow(j);
                     int cellNumber = dataRow.getLastCellNum();
                     HashMap<String,String> data = new HashMap<>(cellNumber);
-                    for(int k=0;k<= cellNumber;k++){
+                    for(int k=0;k< cellNumber;k++){
                         data.put(headerMap.get(k),dataRow.getCell(k).getStringCellValue());
                     }
                     result.add(data);
@@ -80,7 +81,7 @@ public class ExcelImportHandler implements IImport{
         }
     }
 
-    private HashMap<Integer,String> getIndex2AttributeMap(HSSFRow headerRow){
+    private HashMap<Integer,String> getIndex2AttributeMap(Row headerRow){
         int cellNumber = headerRow.getLastCellNum();
         HashMap<Integer,String> result = new HashMap<>(cellNumber);
         for(int i=0;i<cellNumber;i++){

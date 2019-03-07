@@ -75,7 +75,7 @@ public class ResourceService {
         {
             absolutePath = this.saveFile(multipartFile, filePath);
             this.logger.info("上传文件: "+absolutePath+" (fileName); "+filePath+" (filePath);");
-            return absolutePath;
+            return multipartFile.getOriginalFilename();
         }
         catch (IOException t)
         {
