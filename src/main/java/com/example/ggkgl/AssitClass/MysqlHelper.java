@@ -9,13 +9,14 @@ import java.util.List;
 *Mysql工具类
  **/
 public class MysqlHelper {
-    public static Connection connectToRemoteMysqlServer(String host,int port,String schema , String user, String password) throws SQLException {
+    public static Connection connectToRemoteMysqlServer(String host,int port,String schema , String user, String password) throws SQLException, ClassNotFoundException {
         String url = "jdbc:mysql://"+host+":"+port+"/"+schema+"?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8";
         return connectToRemoteMysqlServer(url,user,password);
     }
 
-    public static Connection connectToRemoteMysqlServer(String url, String user, String password) throws SQLException {
+    public static Connection connectToRemoteMysqlServer(String url, String user, String password) throws SQLException, ClassNotFoundException {
         final String driver="com.mysql.jdbc.Driver";
+        Class.forName(driver);
         return DriverManager.getConnection(url,user,password);
     }
 
@@ -26,10 +27,11 @@ public class MysqlHelper {
      * @return     字段名称列表
      */
     public static List<String> getColumnNameOfTable(Connection connection,String tableName) throws SQLException {
-        String sql = "select DISTINCT(COLUMN_NAME) from information_schema.columns where table_name= ?";
+        String sql = "select DISTINCT(COLUMN_NAME) from information_schema.columns where table_name= ? AND " +
+                "TABLE_SCHEMA =(select database())";
         try(PreparedStatement preStmt=connection.prepareStatement(sql)){
             preStmt.setString(1,tableName);
-            ResultSet rs=preStmt.executeQuery(sql);
+            ResultSet rs=preStmt.executeQuery();
             List<String> result = new ArrayList<>();
             while (rs.next()){
                 result.add(rs.getString(1));
@@ -56,7 +58,7 @@ public class MysqlHelper {
         try(PreparedStatement preStmt=connection.prepareStatement(sql)){
             preStmt.setString(1,tableName);
             preStmt.setString(2,colName);
-            ResultSet rs=preStmt.executeQuery(sql);
+            ResultSet rs=preStmt.executeQuery();
             String type = null;
             if(rs.next()){
                 type = rs.getString(1);

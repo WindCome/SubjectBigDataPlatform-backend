@@ -37,8 +37,8 @@ public class MysqlImportHandler implements IImport{
             for(int i = 0;i<dataList.size();i++){
                 HashMap data = dataList.get(i);
                 HashMap newData = new HashMap(data.size());
-                for(Object key:data.keySet()){
-                    if(!keyConfig.containsKey(key)){
+                for(Object key:keyConfig.keySet()){
+                    if(!data.containsKey(key)){
                         throw new Exception("映射缺失键:"+key.toString());
                     }
                     newData.put(keyConfig.getString(key.toString()),data.get(key));

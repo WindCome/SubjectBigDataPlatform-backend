@@ -1,9 +1,6 @@
 package com.example.ggkgl.Controller;
 
-import com.example.ggkgl.AssitClass.ExceptionHelper;
-import com.example.ggkgl.AssitClass.FileHelper;
-import com.example.ggkgl.AssitClass.JSONHelper;
-import com.example.ggkgl.AssitClass.ProcessCallBack;
+import com.example.ggkgl.AssitClass.*;
 import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Model.JobInfo;
 import com.example.ggkgl.Service.*;
@@ -18,6 +15,7 @@ import javax.annotation.Resource;
 import javax.naming.OperationNotSupportedException;
 import javax.servlet.http.HttpServletRequest;
 import java.io.UnsupportedEncodingException;
+import java.sql.SQLException;
 import java.util.*;
 
 
@@ -320,6 +318,17 @@ public class AllController {
     public String uploadResource(@RequestBody String fileBase64Format) throws Exception {
         MultipartFile file = FileHelper.Base64ToMultipartFile(fileBase64Format);
         return resourceService.uploadFile(file);
+    }
+
+    @PostMapping(value = "/config/column")
+    public List<String> getColName(@RequestBody JSONObject params) throws SQLException, ClassNotFoundException {
+        String host = params.getString("host");
+        int port = params.getInt("port");
+        String schema = params.getString("schema") ;
+        String user = params.getString("user");
+        String password = params.getString("password");
+        String tableName = params.getString("tableName");
+        return MysqlHelper.getColumnNameOfTable(MysqlHelper.connectToRemoteMysqlServer(host,port,schema,user,password),tableName);
     }
 
 }
