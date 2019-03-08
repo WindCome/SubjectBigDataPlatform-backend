@@ -1,5 +1,6 @@
 package com.example.ggkgl.Service;
 
+import com.example.ggkgl.AssitClass.MysqlHelper;
 import com.example.ggkgl.Mapper.GreatMapper;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
@@ -96,17 +97,6 @@ public class TableConfigService {
         return matchKeyList.toArray(new String[0]);
     }
 
-    private static final HashMap<String,Class> mysql2JavaDataType = new HashMap<>();
-    static {
-        TableConfigService.mysql2JavaDataType.put("varchar",String.class);
-        TableConfigService.mysql2JavaDataType.put("text",String.class);
-        TableConfigService.mysql2JavaDataType.put("integer",Long.class);
-        TableConfigService.mysql2JavaDataType.put("tinyint",Integer.class);
-        TableConfigService.mysql2JavaDataType.put("float",Float.class);
-        TableConfigService.mysql2JavaDataType.put("boolean",Boolean.class);
-        // 其他类型参考https://www.cnblogs.com/jerrylz/p/5814460.html
-    }
-
     /**
     * 查询mysql字段数据类型
      */
@@ -114,7 +104,7 @@ public class TableConfigService {
     public Class getColumnType(int tableId,String columnName){
         String tableName = this.getTableNameById(tableId);
         String typeName = this.greatMapper.findColumnType(tableName,columnName);
-        return TableConfigService.mysql2JavaDataType.get(typeName.toLowerCase());
+        return MysqlHelper.mysqlTypeMapping(typeName.toLowerCase());
     }
 
     /**
