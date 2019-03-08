@@ -3,7 +3,7 @@ package com.example.ggkgl.Component;
 import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Model.RecordDetailEntity;
 import com.example.ggkgl.Model.RecordEntity;
-import com.example.ggkgl.Service.DataManagerService;
+import com.example.ggkgl.Service.MysqlDataManagerService;
 import com.example.ggkgl.Service.MysqlVersionControlService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.*;
@@ -28,8 +28,8 @@ public class MysqlCURDAOP {
      */
     @Around(value = "execution(* mysqlDataRetention(..)) &&"+"args(tableId,id,data,opCode,record)",
             argNames = "thisJoinPoint,tableId,id,data,opCode,record")
-    public Object aopPerRecord(ProceedingJoinPoint thisJoinPoint,int tableId,Object id,HashMap data,
-                             DataManagerService.OperatorCode opCode,boolean record) throws Throwable {
+    public Object aopPerRecord(ProceedingJoinPoint thisJoinPoint, int tableId, Object id, HashMap data,
+                               MysqlDataManagerService.OperatorCode opCode, boolean record) throws Throwable {
         Object returnValue;
         RecordDetailEntity recordDetail = null;
         //生成记录

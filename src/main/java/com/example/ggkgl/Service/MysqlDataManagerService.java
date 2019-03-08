@@ -19,7 +19,7 @@ import java.util.*;
 *  数据增删查改相关
 **/
 @Service
-public class DataManagerService {
+public class MysqlDataManagerService {
     public enum OperatorCode{
         NEW("NEW"),UPDATE("UPDATE"),DELETE("DELETE");
         private String value;

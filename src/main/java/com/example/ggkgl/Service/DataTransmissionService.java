@@ -22,7 +22,7 @@ public class DataTransmissionService {
     private final Logger logger = Logger.getLogger(DataTransmissionService.class);
 
     @Resource
-    private DataManagerService dataManagerService;
+    private MysqlDataManagerService mysqlDataManagerService;
 
     @Resource
     private HandlerFactory handlerFactory;
@@ -37,7 +37,7 @@ public class DataTransmissionService {
      * @return  导出结果信息
      */
     public JobInfo export(String target, int tableId, JSONObject params, ProcessCallBack callBack) throws Exception {
-        List<HashMap> data = dataManagerService.conditionSearch(null,tableId,-1,-1);
+        List<HashMap> data = mysqlDataManagerService.conditionSearch(null,tableId,-1,-1);
         IExport exportHandler = handlerFactory.getExportHandler(target);
         if(exportHandler == null){
             this.logger.info("找不到合适的数据导出器");
@@ -66,11 +66,11 @@ public class DataTransmissionService {
                 List<HashMap> opMapList = new ArrayList<>(dataList.size());
                 for(HashMap data:dataList){
                     HashMap<String,Object> opMap = new HashMap<>(2);
-                    opMap.put("op", DataManagerService.OperatorCode.NEW);
+                    opMap.put("op", MysqlDataManagerService.OperatorCode.NEW);
                     opMap.put("value",data);
                     opMapList.add(opMap);
                 }
-                dataManagerService.mysqlDataRetention(tableId,opMapList,callBack,true);
+                mysqlDataManagerService.mysqlDataRetention(tableId,opMapList,callBack,true);
                 if(callBack != null){
                     callBack.processFinished(null);
                 }

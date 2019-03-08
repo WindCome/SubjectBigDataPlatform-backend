@@ -1,6 +1,6 @@
 package com.example.ggkgl.Model;
 
-import com.example.ggkgl.Service.DataManagerService;
+import com.example.ggkgl.Service.MysqlDataManagerService;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -34,7 +34,7 @@ public class RecordDetailEntity implements Serializable{
      * 操作码
      */
     @Enumerated(EnumType.STRING)
-    private DataManagerService.OperatorCode op;
+    private MysqlDataManagerService.OperatorCode op;
 
     /**
      * 旧值,json格式
@@ -56,11 +56,11 @@ public class RecordDetailEntity implements Serializable{
      */
     private Timestamp modifyTime;
 
-    public DataManagerService.OperatorCode getOp() {
+    public MysqlDataManagerService.OperatorCode getOp() {
         return op;
     }
 
-    public void setOp(DataManagerService.OperatorCode op) {
+    public void setOp(MysqlDataManagerService.OperatorCode op) {
         this.op = op;
     }
 

@@ -121,7 +121,7 @@ public class MysqlVersionControlService {
     /**
     * 生成一条数据的更改记录
      */
-    public RecordDetailEntity generateRecordDetail(int tableId,Object id, HashMap data, DataManagerService.OperatorCode opCode) throws Exception {
+    public RecordDetailEntity generateRecordDetail(int tableId, Object id, HashMap data, MysqlDataManagerService.OperatorCode opCode) throws Exception {
         RecordDetailEntity recordDetail = new RecordDetailEntity();
         recordDetail.setTableId(tableId);
         if(data!=null){

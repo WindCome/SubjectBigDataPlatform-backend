@@ -33,7 +33,7 @@ public class AllController {
     private GreatMapper greatMapper;
 
     @Resource
-    private DataManagerService dataManagerService;
+    private MysqlDataManagerService mysqlDataManagerService;
 
     @Resource
     private TableConfigService tableConfigService;
@@ -70,9 +70,9 @@ public class AllController {
     public String add(@PathVariable("tableId") int tableId, @RequestBody JSONObject jsonObject) {
         try{
             HashMap<String,Object> data = new HashMap<>();
-            data.put("op", DataManagerService.OperatorCode.NEW);
+            data.put("op", MysqlDataManagerService.OperatorCode.NEW);
             data.put("value",jsonObject.toString());
-            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
+            this.mysqlDataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
             return null;
         }catch (Exception e){
             e.printStackTrace();
@@ -91,9 +91,9 @@ public class AllController {
     {
         try{
             HashMap<String,Object> data = new HashMap<>();
-            data.put("op", DataManagerService.OperatorCode.DELETE);
+            data.put("op", MysqlDataManagerService.OperatorCode.DELETE);
             data.put("index",id);
-            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
+            this.mysqlDataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
             return null;
         }catch (Exception e){
             e.printStackTrace();
@@ -114,10 +114,10 @@ public class AllController {
     {
         try{
             HashMap<String,Object> data = new HashMap<>();
-            data.put("op", DataManagerService.OperatorCode.UPDATE);
+            data.put("op", MysqlDataManagerService.OperatorCode.UPDATE);
             data.put("index",id);
             data.put("value",jsonObject.toString());
-            this.dataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
+            this.mysqlDataManagerService.mysqlDataRetention(tableId, Collections.singletonList(data),null,true);
             return null;
         }catch (Exception e){
             e.printStackTrace();
@@ -226,9 +226,9 @@ public class AllController {
                                     ,@RequestParam(value="page",defaultValue = "0") int page,
                                     @RequestParam(value = "size",defaultValue = "0") int size)
     {
-        List<HashMap> searchMaps=this.dataManagerService.conditionSearch(jsonObject,tableId,page,size);
+        List<HashMap> searchMaps=this.mysqlDataManagerService.conditionSearch(jsonObject,tableId,page,size);
         HashMap<String,Object> hashMap=new HashMap<>();
-        hashMap.put("totalSize",this.dataManagerService.conditionCount(jsonObject,tableId));
+        hashMap.put("totalSize",this.mysqlDataManagerService.conditionCount(jsonObject,tableId));
         searchMaps.add(hashMap);
         return searchMaps;
     }

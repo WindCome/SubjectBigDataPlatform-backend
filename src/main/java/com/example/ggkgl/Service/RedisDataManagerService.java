@@ -16,7 +16,7 @@ import java.util.*;
 @Service
 public class RedisDataManagerService {
     @Resource
-    private DataManagerService dataManagerService;
+    private MysqlDataManagerService mysqlDataManagerService;
 
     @Resource
     private RedisVersionControlService redisVersionControlService;
@@ -205,7 +205,7 @@ public class RedisDataManagerService {
             contrastResult.put("oriData",oriData);
             return contrastResult;
         }
-        HashMap contrastResult = this.dataManagerService.contrast(tableId,data);
+        HashMap contrastResult = this.mysqlDataManagerService.contrast(tableId,data);
         if(modifyInfo != null){
             Object targetPrimaryValue = modifyInfo.getPrimaryValue();
             if (targetPrimaryValue != null){
@@ -221,7 +221,7 @@ public class RedisDataManagerService {
                     }
                 }
                 if(targetObject == null){
-                    targetObject = this.dataManagerService.findByIdEquals(tableId,targetPrimaryValue);
+                    targetObject = this.mysqlDataManagerService.findByIdEquals(tableId,targetPrimaryValue);
                 }
                 if(targetObject != null){
                     ArrayList dataList = (ArrayList) contrastResult.get("data");

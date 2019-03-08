@@ -26,7 +26,7 @@ public class UpdateController {
     private final RedisVersionControlService redisVersionControlService;
 
     @Resource
-    private DataManagerService dataManagerService;
+    private MysqlDataManagerService mysqlDataManagerService;
 
     @Resource
     private TableConfigService tableConfigService;
@@ -168,7 +168,7 @@ public class UpdateController {
             String status = contrastResult.get("status").toString();
             HashMap<String,Object> opMap = new HashMap<>(3);
             if(status.equals("new")){
-                opMap.put("op", DataManagerService.OperatorCode.NEW);
+                opMap.put("op", MysqlDataManagerService.OperatorCode.NEW);
             }else if(status.equals("update")){
                 List<HashMap> similarData = (List<HashMap>)contrastResult.get("data");
                 if (similarData.size() == 0){
@@ -176,13 +176,13 @@ public class UpdateController {
                     continue;
                 }
                 HashMap targetData = similarData.get(0);
-                opMap.put("op", DataManagerService.OperatorCode.DELETE);
+                opMap.put("op", MysqlDataManagerService.OperatorCode.DELETE);
                 opMap.put("index",targetData.get(primaryKey));
             }
             opMap.put("value",contrastResult.get("oriData"));
             data.add(opMap);
         }
-        dataManagerService.mysqlDataRetention(tableId,data,processCallBack,true);
+        mysqlDataManagerService.mysqlDataRetention(tableId,data,processCallBack,true);
         return true;
     }
 
