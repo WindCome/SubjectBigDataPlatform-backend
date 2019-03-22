@@ -49,7 +49,7 @@ public class RedisVersionControlService {
      * @param currentData 新的数据
      * @return 版本是否发生了变化
      */
-    @CacheEvict(value = "RedisContrastResult",allEntries = true,condition = "#result&&originalData!=null")
+    @CacheEvict(value = "RedisContrastResult",allEntries = true,condition = "#originalData!=null&&#result")
     public boolean contrast(String redisKey, Object originalData, Object currentData){
         boolean changed = (originalData == null && currentData!=null) ||
                 (originalData != null && (currentData == null || !originalData.equals(currentData)));
@@ -119,23 +119,29 @@ public class RedisVersionControlService {
      *                           "id": Object (mysql记录的主键值，用于指明该爬虫信息用于更新哪条mysql记录),
      *                           "value":Map (爬虫数据修改后的值)
      *                          }
-     * @return  发生变化的redis数据下标
+     * @return  {Boolean(是否修改成功):
+     *              Object(修改成功时放入true\false表示数据是否发生改变，修改失败时放入出错信息)}
      */
     @SuppressWarnings("unchecked")
-    public Pair<String,String> recordModifyRedisData(String redisKey, HashMap modifyInfo){
+    public Pair<Boolean,Object> recordModifyRedisData(String redisKey, HashMap modifyInfo){
         if(modifyInfo == null){
-            return new Pair<>("fail","修改信息为空");
+            return new Pair<>(false,"修改信息为空");
         }
-        Pair<String,String> result = new Pair<>("success","");
+        Pair<Boolean,Object> result;
         this.lock.readLock().lock();
         try{
             int index = (int)modifyInfo.get("index");
             //直接调用会导致缓存清除失败
             RedisVersionControlService redisVersionControlService = SpringUtil.getBean(RedisVersionControlService.class);
-            redisVersionControlService.recordModifyRedisData(redisKey,index,modifyInfo);
+            boolean changed = redisVersionControlService.recordModifyRedisData(redisKey,index,modifyInfo);
+            if(changed){
+                result = new Pair<>(true,true);
+            }else{
+                result = new Pair<>(true,false);
+            }
         }
         catch (Exception e){
-            result = new Pair<>("fail",ExceptionHelper.getExceptionAllInfo(e));
+            result = new Pair<>(false,ExceptionHelper.getExceptionAllInfo(e));
         }finally {
             this.lock.readLock().unlock();
         }

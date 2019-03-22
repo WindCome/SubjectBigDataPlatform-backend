@@ -88,7 +88,8 @@ public class UpdateController {
         jsonObject.put("op", RedisDataManagerService.OperatorCode.UPDATE);
         jsonObject.put("index",index);
         String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
-        return this.redisVersionControlService.recordModifyRedisData(redisKey,JSONHelper.json2Map(jsonObject));
+        Pair<Boolean,Object> ans = this.redisVersionControlService.recordModifyRedisData(redisKey,JSONHelper.json2Map(jsonObject));
+        return this.handleModifyResult(ans,redisKey,index);
     }
 
     /**
@@ -106,12 +107,8 @@ public class UpdateController {
         params.put("op", RedisDataManagerService.OperatorCode.RESET);
         params.put("index",index);
         String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
-        Pair<String,String> result = this.redisVersionControlService.recordModifyRedisData(redisKey,params);
-        if(result.getKey().equals("success")){
-            HashMap contrastResult = this.redisDataManagerService.getContrastResult(redisKey,index);
-            result = new Pair<>("success",JSONHelper.map2Json(contrastResult));
-        }
-        return result;
+        return this.handleModifyResult(this.redisVersionControlService.recordModifyRedisData(redisKey,params),
+                                            redisKey,index);
     }
 
     /**
@@ -128,7 +125,19 @@ public class UpdateController {
         params.put("op", RedisDataManagerService.OperatorCode.DELETE);
         params.put("index",index);
         String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
-        return this.redisVersionControlService.recordModifyRedisData(redisKey,params);
+        return this.handleModifyResult(this.redisVersionControlService.recordModifyRedisData(redisKey,params),
+                                            redisKey,index);
+    }
+
+    private Pair<String,String> handleModifyResult(Pair<Boolean,Object> ans,String redisKey,int index){
+        if(ans.getKey()){
+            String detail = "";
+            if(ans.getValue().equals(true)){
+                detail = JSONHelper.map2Json(this.redisDataManagerService.getContrastResult(redisKey,index));
+            }
+            return new Pair<>("success",detail);
+        }
+        return new Pair<>("fail",ans.getValue().toString());
     }
 
     /**
