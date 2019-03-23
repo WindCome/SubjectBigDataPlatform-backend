@@ -7,10 +7,14 @@ import com.example.ggkgl.Service.*;
 import javafx.util.Pair;
 import net.sf.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.naming.OperationNotSupportedException;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -33,6 +37,9 @@ public class UpdateController {
 
     @Resource
     private RedisDataManagerService redisDataManagerService;
+
+    @Resource
+    private ResourceService resourceService;
 
     @Autowired
     public UpdateController(SpiderService spiderService, RedisVersionControlService redisVersionControlService) {
@@ -198,41 +205,45 @@ public class UpdateController {
     /**
      * 生成更新数据
      * @param tableId 表的Id（即保存在META_ENTITY中的自增字段）
-     * @return  爬虫线程id
+     * @return 爬虫是否启动成功
      */
     @GetMapping(value = "/generateUpgrade/{tableId}")
-    public long generate(@PathVariable("tableId") int tableId)
+    public boolean generate(@PathVariable("tableId") int tableId)
     {
-        String command = this.tableConfigService.getSpiderCommand(tableId);
-        String spiderPath = this.tableConfigService.getSpiderPath(tableId);
-        return this.spiderService.execCrawl(spiderPath, command,
-                new SpiderService.CrawlCallBack(){
-            private Object dataDump = null;
-            private String redisKey;
-            @Override
-            public void onStart() {
-                redisKey = UpdateController.this.redisDataManagerService.getSpiderDataRedisKey(tableId);
-                this.dataDump = UpdateController.this.redisDataManagerService.getJsonDataList(redisKey);
-            }
-            @Override
-            public void onFinished() {
-                String oldVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
-                UpdateController.this.redisVersionControlService.contrast(redisKey,dataDump,
-                        UpdateController.this.redisDataManagerService.getJsonDataList(redisKey));
-                String currentVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
-                List<Pair> changeList = UpdateController.this.redisVersionControlService.getIndexChangeDetail(redisKey,oldVersion,currentVersion);
-                UpdateController.this.redisVersionControlService.resetIndex(redisKey, changeList);
-            }
-        });
+        try{
+            this.spiderService.execCrawl(tableId,
+                    new SpiderService.CrawlCallBack(){
+                        private Object dataDump = null;
+                        private String redisKey;
+                        @Override
+                        public void onStart() {
+                            redisKey = UpdateController.this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+                            this.dataDump = UpdateController.this.redisDataManagerService.getJsonDataList(redisKey);
+                        }
+                        @Override
+                        public void onFinished() {
+                            String oldVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
+                            UpdateController.this.redisVersionControlService.contrast(redisKey,dataDump,
+                                    UpdateController.this.redisDataManagerService.getJsonDataList(redisKey));
+                            String currentVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
+                            List<Pair> changeList = UpdateController.this.redisVersionControlService.getIndexChangeDetail(redisKey,oldVersion,currentVersion);
+                            UpdateController.this.redisVersionControlService.resetIndex(redisKey, changeList);
+                        }
+                    });
+        }catch (Exception e){
+            e.printStackTrace();
+            return false;
+        }
+        return true;
     }
 
     /**
      * 查看某个爬取结果是否可用
      * @param tid 生成更新数据接口返回的线程id
-     * @return  true可用  false不可用
+     * @return  true可用，false不可用
      */
     @GetMapping(value = "/generateUpgrade/result/{tid}")
-    public Boolean isDataAvailable(@PathVariable("tid") int tid){
+    public boolean isDataAvailable(@PathVariable("tid") int tid){
         return this.spiderService.isSpiderCrawlFinish(tid);
     }
 
@@ -329,8 +340,24 @@ public class UpdateController {
      */
     @GetMapping(value = "/spider/log/{tableId}")
     public LogInfoEntity getCrawlLog(@PathVariable("tableId")int tableId){
-        String command = this.tableConfigService.getSpiderCommand(tableId);
-        String spiderPath = this.tableConfigService.getSpiderPath(tableId);
-        return this.spiderService.getLastCrawlLog(spiderPath,command);
+        return this.spiderService.getLastCrawlLog(tableId);
+    }
+
+    /**
+     * 下载爬虫运行Log
+     * @param tableId  表的Id（即保存在META_ENTITY中的自增字段）
+     * @return 日志文本
+     */
+    @GetMapping(value = "/spider/log/download/{tableId}")
+    public ResponseEntity<FileSystemResource> downloadCrawlLog(@PathVariable("tableId")int tableId) throws IOException, OperationNotSupportedException {
+        LogInfoEntity log = this.spiderService.getLastCrawlLog(tableId);
+        List<String> logContent = new ArrayList<>();
+        logContent.add("运行于:"+log.getGenerateAtTime());
+        logContent.add("爬取耗时: "+log.getSpendTime()+"ms");
+        logContent.add("详情:");
+        logContent.addAll(log.getDetailInfo());
+        final String fileName = "spiderLog-"+System.currentTimeMillis()+".txt";
+        this.resourceService.saveFile(logContent,fileName);
+        return resourceService.download(fileName);
     }
 }

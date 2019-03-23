@@ -16,7 +16,7 @@ import java.util.List;
 public class LogInfoEntity implements Serializable{
     @Id
     @JsonIgnore
-    private String key;
+    private int key;
 
     /**
      * 日志生成时间
@@ -42,16 +42,16 @@ public class LogInfoEntity implements Serializable{
     public LogInfoEntity() {
     }
 
-    public LogInfoEntity(String key) {
+    public LogInfoEntity(int key) {
         this.key = key;
         this.setGenerateTime(System.currentTimeMillis());
     }
 
-    public String getKey() {
+    public int getKey() {
         return key;
     }
 
-    public void setKey(String key) {
+    public void setKey(int key) {
         this.key = key;
     }
 

@@ -81,6 +81,7 @@ public class RedisVersionControlService {
         if (!versionInfo.getString("key").equals(fromVersion) || !versionInfo.getString("value").equals(toVersion)){
             return null;
         }
+        System.out.println("detail "+data.get("detail"));
         return (List<Pair>)data.get("detail");
     }
 

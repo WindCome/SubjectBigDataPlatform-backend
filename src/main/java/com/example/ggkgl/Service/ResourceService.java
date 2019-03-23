@@ -8,12 +8,13 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.naming.OperationNotSupportedException;
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
+import java.nio.charset.Charset;
+import java.util.List;
 
 /**
 * 文件下载、上传
@@ -101,5 +102,36 @@ public class ResourceService {
         this.logger.info("保存文件: "+absolutePath+" (absolutePath); "
                 +saveFile.getAbsolutePath()+" (saveFile.getAbsolutePath());");
         return saveFile.getAbsolutePath();
+    }
+
+    /**
+     * @param content 文本内容
+     * @param fileName 文件名称
+     * @throws IOException 生成文件夹出错、保存文件出错
+     */
+    public void saveFile(List<String> content,String fileName) throws IOException
+    {
+        String path = ResourceService.STORAGE_FILE_PATH;
+        if(StringUtils.isEmpty(fileName)){
+            fileName = System.currentTimeMillis()+".txt";
+        }
+        File fileDir = new File(path);
+        if (!fileDir.exists()&&!fileDir.mkdirs())
+            throw new IOException();
+        String absolutePath= path+File.separator+fileName;
+        File file = new File(absolutePath);
+        try(FileOutputStream fileOutputStream = new FileOutputStream(file)){
+            content.forEach(str->{
+                try {
+                    final String tmp = str+"\r\n";
+                    fileOutputStream.write(tmp.getBytes(Charset.forName("utf-8")));
+                }
+                catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 }

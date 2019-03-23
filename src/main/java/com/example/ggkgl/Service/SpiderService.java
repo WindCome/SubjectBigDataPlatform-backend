@@ -11,7 +11,6 @@ import javax.annotation.Resource;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -27,9 +26,12 @@ public class SpiderService {
      */
     private static final String DEFAULT_SPIDERS_PATH = "D:\\Project\\ConfigurableSpiders\\ConfigurableSpiders";
 
-    private ConcurrentHashMap<Integer,Thread> spiderThreads = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer,Thread> spiderThreads = new ConcurrentHashMap<>(60);
 
     private final Logger logger = Logger.getLogger(SpiderService.class);
+
+    @Resource
+    private TableConfigService tableConfigService;
 
     @Resource
     private LogRepository logRepository;
@@ -47,26 +49,24 @@ public class SpiderService {
 
     /**
      * 根据参数启动爬虫进行数据爬取
-     * @param spiderPath 爬虫所在目录路径
-     * @param execCommand 启动命令
+     * @param tableId   mysql表id
      * @param callBack  爬虫爬取结束回调
-     * @return           爬虫线程ID
      */
-    public long execCrawl(String spiderPath, String execCommand,CrawlCallBack callBack){
-        final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
-        long tid = this.isSpiderCrawlFinish(spiderExecPath,execCommand);
-        if(tid > 0){
-            return tid;
+    public void execCrawl(int tableId,CrawlCallBack callBack){
+        if(!isSpiderCrawlFinish(tableId)){
+            return ;
         }
-        Integer hashKey = this.getHashKey(spiderExecPath,execCommand);
-        synchronized (hashKey.toString().intern()){
-            tid = this.isSpiderCrawlFinish(spiderExecPath,execCommand);
-            if(tid > 0){
-                return tid;
+        String execCommand = this.tableConfigService.getSpiderCommand(tableId);
+        String spiderPath = this.tableConfigService.getSpiderPath(tableId);
+        final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
+        String watcher = "spiderProcess"+tableId;
+        synchronized (watcher.intern()){
+            if(!isSpiderCrawlFinish(tableId)){
+                return;
             }
             Thread thread = new Thread(() -> {
                 List<String> logInfo = new ArrayList<>();
-                LogInfoEntity logInfoEntity = new LogInfoEntity(hashKey.toString());
+                LogInfoEntity logInfoEntity = new LogInfoEntity(tableId);
                 StopWatch stopWatch = new StopWatch();
                 try {
                     ProcessBuilder processBuilder = new ProcessBuilder(execCommand.split(" "));
@@ -102,59 +102,20 @@ public class SpiderService {
                 logRepository.save(logInfoEntity);
             });
             thread.start();
-            this.spiderThreads.put(hashKey,thread);
+            this.spiderThreads.put(tableId,thread);
         }
-        return this.spiderThreads.get(hashKey).getId();
     }
 
     /**
      * 查询爬虫进程是否已经结束
-     * @param tid 爬虫线程ID
-     * @return  true爬虫线程已经结束，false爬虫正在进行,null不存在该爬虫线程
      */
-    public Boolean isSpiderCrawlFinish(long tid) {
-        Boolean result = null;
-        for(Thread thread :this.spiderThreads.values()){
-            if(thread.getId() == tid ){
-                Thread.State state = thread.getState();
-                result = state == TERMINATED;
-            }
-        }
-        return result;
+    public boolean isSpiderCrawlFinish(int tableId) {
+        return !this.spiderThreads.containsKey(tableId)
+                || this.spiderThreads.get(tableId).getState() == TERMINATED;
     }
 
-    /**
-     * 查询爬虫进程是否已经结束
-     * @return 爬虫进程结束返回-1，不存在爬虫进程返回0，爬虫正在运行返回爬虫线程id
-     */
-    private long isSpiderCrawlFinish(String spiderPath, String execCommand) {
-        Integer hashKey = this.getHashKey(spiderPath,execCommand);
-        if(this.spiderThreads.containsKey(hashKey)){
-            long tid = this.spiderThreads.get(hashKey).getId();
-            if(!this.isSpiderCrawlFinish(tid)){
-                return tid;
-            }
-            return -1;
-        }
-        return 0;
-    }
-
-    private Thread getSpiderThread(String spiderPath, String execCommand){
-        Integer hashKey = this.getHashKey(spiderPath,execCommand);
-        if(this.spiderThreads.containsKey(hashKey)){
-            return this.spiderThreads.get(hashKey);
-        }
-        return null;
-    }
-
-    private Integer getHashKey(String spiderPath, String execCommand){
-        return Objects.hash(execCommand,spiderPath);
-    }
-
-    public LogInfoEntity getLastCrawlLog(String spiderPath, String execCommand){
-        final String spiderExecPath = spiderPath == null ? SpiderService.DEFAULT_SPIDERS_PATH : spiderPath;
-        String key = this.getHashKey(spiderExecPath,execCommand).toString();
-        Optional<LogInfoEntity> optional = this.logRepository.findById(key);
+    public LogInfoEntity getLastCrawlLog(int tableId){
+        Optional<LogInfoEntity> optional = this.logRepository.findById(tableId);
         return optional.orElse(null);
     }
 }
