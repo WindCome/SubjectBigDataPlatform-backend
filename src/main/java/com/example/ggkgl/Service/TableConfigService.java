@@ -5,11 +5,16 @@ import com.example.ggkgl.Mapper.GreatMapper;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import net.sf.json.util.JSONTokener;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.sql.PreparedStatement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -17,9 +22,19 @@ import java.util.List;
 * mysql表配置相关
  **/
 @Service
-public class TableConfigService {
+public class TableConfigService implements InitializingBean {
     @Resource
     private GreatMapper greatMapper;
+
+    @Resource
+    private JdbcTemplate jdbcTemplate;
+
+    private Logger logger = Logger.getLogger(TableConfigService.class);
+
+    /**
+     * 用于标志记录是否被删除的字段名称
+     */
+    public static final String deleteFieldName = "deleted";
 
     /**
      * 获取公共库表的大小（数据条目数）
@@ -29,6 +44,9 @@ public class TableConfigService {
     public int getSize(int tableId)
     {
         String tableName=this.getTableNameById(tableId);
+        if(Arrays.asList(this.getColumnNamesOfTable(tableId)).contains(deleteFieldName)){
+            return greatMapper.getSizeWithCondition(tableName,false);
+        }
         return greatMapper.getSize(tableName);
     }
 
@@ -140,6 +158,36 @@ public class TableConfigService {
             return upgradeJson.getJSONObject("path").getString("value");
         }else{
             return null;
+        }
+    }
+
+    /**
+     * 检查指定表是否存在用于标志记录是否被删除的字段，没有则新增该字段
+     */
+    private void checkDeleteField(int tableId) {
+        if(!Arrays.asList(this.getColumnNamesOfTable(tableId)).contains(deleteFieldName)){
+            try{
+                String tableName = this.getTableNameById(tableId);
+                String sql = "ALTER TABLE "+tableName+" ADD "+deleteFieldName+" bool " +
+                        "DEFAULT false;";
+                jdbcTemplate.execute(sql);
+            }
+            catch (Exception e){
+                e.printStackTrace();
+                this.logger.error(e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 在数据库中自动添加用于标记数据是否被删除字段
+     * */
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        long numberOfSchema = this.greatMapper.countDistinctColumn("meta_entity", "id");
+        this.logger.info("共"+numberOfSchema+"个公共库");
+        for (int i = 1; i <= numberOfSchema; i++) {
+            this.checkDeleteField(i);
         }
     }
 }

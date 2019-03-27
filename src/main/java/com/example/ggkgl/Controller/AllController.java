@@ -204,9 +204,9 @@ public class AllController {
         int start=(page-1)*size;
         List<HashMap> hashMaps;
         try{
-            hashMaps=greatMapper.desc(tableName,start,size,orderFactor);
+            hashMaps=greatMapper.desc(tableName,false,start,size,orderFactor);
         }catch (Exception ignore){
-            hashMaps=greatMapper.desc(tableName,start,size,"ID");
+            hashMaps=greatMapper.desc(tableName,false,start,size,"ID");
         }
         return hashMaps;
     }

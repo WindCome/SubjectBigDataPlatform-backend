@@ -6,6 +6,7 @@ import com.example.ggkgl.Component.SpringUtil;
 import com.example.ggkgl.Mapper.GreatMapper;
 import javafx.util.Pair;
 import net.sf.json.JSONObject;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
@@ -14,6 +15,7 @@ import javax.annotation.Resource;
 import javax.validation.constraints.NotNull;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
 *  数据增删查改相关
@@ -200,6 +202,7 @@ public class MysqlDataManagerService {
      */
     @SuppressWarnings("unchecked")
     @Transactional
+    @CacheEvict(value = "RedisContrastResult",allEntries = true)
     public HashMap mysqlDataRetention(int tableId,Object id, HashMap data,OperatorCode opCode,boolean record){
         String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
         if(data!=null){
@@ -223,12 +226,18 @@ public class MysqlDataManagerService {
             if(this.tableConfigService.getColumnType(tableId,primaryKey) == String.class){
                 id = "'"+id+"'";
             }
+            final String deleteFieldName = TableConfigService.deleteFieldName;
             if(opCode == OperatorCode.UPDATE){
+                //标记是否删除字段直接使用true或false更新会报错，要先转换为int
+                if (data != null && data.containsKey(deleteFieldName)) {
+                    boolean deleted = (boolean) data.get(deleteFieldName);
+                    data.put(deleteFieldName, deleted ? 1 : 0);
+                }
                 this.greatMapper.update(tableName,id,data);
                 return oldValue;
             }
             else if(opCode == OperatorCode.DELETE){
-                this.greatMapper.delete(tableName,id.toString());
+                this.greatMapper.updateField(tableName,id,deleteFieldName,true);
                 return oldValue;
             }
             return null;
@@ -261,7 +270,7 @@ public class MysqlDataManagerService {
         if(conditionFilter == null){
             conditionFilter = new JSONObject();
         }
-        return greatMapper.comboSearch(tableName,this.filter2List(conditionFilter),start,size);
+        return greatMapper.comboSearch(tableName, this.filter2List(conditionFilter),start,size);
     }
 
     /**
