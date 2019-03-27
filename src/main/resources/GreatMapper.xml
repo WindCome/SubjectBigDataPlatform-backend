@@ -14,7 +14,7 @@
     </insert>
 
     <select id="desc" statementType="STATEMENT" resultType="HashMap">
-        select * from ${tableName} order by ${order} desc, modify_time desc limit ${start} ,${length}
+        select * from ${tableName} where deleted=${deleted} order by ${order} desc, modify_time desc limit ${start} ,${length}
     </select>
     <select id="display" statementType="STATEMENT" resultType="HashMap">
         select * from ${tableName} limit ${start} ,${length}
@@ -25,12 +25,16 @@
         select count(*) from ${tableName}
     </select>
 
+    <select id="getSizeWithCondition" statementType="STATEMENT" resultType="Integer">
+        select count(*) from ${tableName} where deleted = ${deleted}
+    </select>
+
     <select id="getDesc" statementType="STATEMENT" resultType="String">
         select description from meta_data_2 where tableName='${tableName}'
     </select>
 
    <select id="freeInspect" statementType="STATEMENT" resultType="HashMap">
-       select * from ${tableName} where ${key}='${value}'
+       select * from ${tableName} where ${key}='${value}' and deleted=false
    </select>
 
 
@@ -44,6 +48,7 @@
         <foreach collection="conditions" separator="and" item="condition" index="index">
             ${condition.key} like '%${condition.value}%'
         </foreach>
+        and deleted=false
         <if test="start >=0 and length >=0">limit ${start} ,${length}</if>
     </select>
 
@@ -52,6 +57,7 @@
         <foreach collection="conditions" separator="and" item="condition" index="index">
             ${condition.key} like '%${condition.value}%'
         </foreach>
+        and deleted=false
     </select>
 
     <update id="update" statementType="STATEMENT">
@@ -67,6 +73,10 @@
         <where>
             id=${id}
         </where>
+    </update>
+
+    <update id="updateField" statementType="STATEMENT">
+        update ${tableName} set ${field} = ${value} where id=${id}
     </update>
 
     <update id="updateDesc" statementType="STATEMENT">

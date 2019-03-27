@@ -12,10 +12,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -183,7 +181,7 @@ public class TableConfigService implements InitializingBean {
      * 在数据库中自动添加用于标记数据是否被删除字段
      * */
     @Override
-    public void afterPropertiesSet() throws Exception {
+    public void afterPropertiesSet(){
         long numberOfSchema = this.greatMapper.countDistinctColumn("meta_entity", "id");
         this.logger.info("共"+numberOfSchema+"个公共库");
         for (int i = 1; i <= numberOfSchema; i++) {
