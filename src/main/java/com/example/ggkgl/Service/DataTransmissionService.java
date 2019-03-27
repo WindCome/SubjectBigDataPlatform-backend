@@ -7,6 +7,11 @@ import com.example.ggkgl.Component.Import.IImport;
 import com.example.ggkgl.Model.JobInfo;
 import net.sf.json.JSONObject;
 import org.apache.log4j.Logger;
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -29,6 +34,9 @@ public class DataTransmissionService {
 
     @Resource
     private ThreadManagerService threadManagerService;
+
+    @Resource
+    private TableConfigService tableConfigService;
 
     /**
      * @param target 导出目的类型("excel"、"mysql"等)
@@ -94,5 +102,23 @@ public class DataTransmissionService {
             callBack.setProgressId(jobId);
         }
         return new JobInfo(JobInfo.JOB,jobId);
+    }
+
+    /**
+     * 获取用于Excel导入的模板
+     */
+    public Workbook getExcelTemplateForImport(int tableId){
+        HSSFWorkbook workbook = new HSSFWorkbook();
+        String sheetName = "sheet1";
+        HSSFSheet sheet = workbook.createSheet(sheetName);
+        HSSFRow row = sheet.createRow(0);
+        HSSFCell cell;
+        List<String> title = this.tableConfigService.getModifiableFields(tableId);
+        for(int i=0;i<title.size();i++){
+            String attribute = title.get(i);
+            cell = row.createCell(i);
+            cell.setCellValue(attribute);
+        }
+        return workbook;
     }
 }

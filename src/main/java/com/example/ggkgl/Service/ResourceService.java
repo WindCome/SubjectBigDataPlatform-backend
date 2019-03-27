@@ -1,5 +1,6 @@
 package com.example.ggkgl.Service;
 
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.log4j.Logger;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -7,11 +8,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.naming.OperationNotSupportedException;
+import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.List;
@@ -35,12 +36,24 @@ public class ResourceService {
      * @param fileName 资源的url
      * @return 下载文件实体
      */
-    public ResponseEntity<FileSystemResource> download(String fileName) throws UnsupportedEncodingException,
+    public ResponseEntity<FileSystemResource> download(@NotNull String fileName) throws UnsupportedEncodingException,
             OperationNotSupportedException {
-        Assert.notNull(fileName,"下载url不能为空");
         fileName = STORAGE_FILE_PATH + File.separator +fileName;
         File file = new File(fileName);
-        if (file.exists()) {
+        return this.download(file);
+    }
+
+    /**
+     * @param file 文件
+     * @return 下载文件实体
+     */
+    public ResponseEntity<FileSystemResource> download(@NotNull File file) throws UnsupportedEncodingException,
+            OperationNotSupportedException {
+        if(!file.exists()){
+            throw new OperationNotSupportedException("不存在该资源: "+file.getAbsolutePath());
+        }
+        File rootDir = new File(STORAGE_FILE_PATH);
+        if (file.getParentFile().equals(rootDir)) {
             HttpHeaders headers = new HttpHeaders();
             String contentDisposition = new String(file.getName().getBytes(),"utf-8");
             headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -53,8 +66,9 @@ public class ResourceService {
                     .contentLength(file.length())
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .body(new FileSystemResource(file));
+        }else{
+            throw new OperationNotSupportedException("无权访问该文件");
         }
-        throw new OperationNotSupportedException("不存在该资源: "+fileName);
     }
 
     /**
@@ -102,6 +116,22 @@ public class ResourceService {
         this.logger.info("保存文件: "+absolutePath+" (absolutePath); "
                 +saveFile.getAbsolutePath()+" (saveFile.getAbsolutePath());");
         return saveFile.getAbsolutePath();
+    }
+
+    /**
+     * 创建一个临时文件
+     * @param postFix 文件后缀
+     */
+    public File createTmpFile(String postFix) throws IOException {
+        boolean created = false;
+        File file=null;
+        while(!created){
+            String storagePath = STORAGE_FILE_PATH+File.separator+System.currentTimeMillis()+
+                    RandomStringUtils.randomAlphanumeric(4)+"."+postFix;
+            file = new File(storagePath);
+            created = file.createNewFile();
+        }
+        return file;
     }
 
     /**

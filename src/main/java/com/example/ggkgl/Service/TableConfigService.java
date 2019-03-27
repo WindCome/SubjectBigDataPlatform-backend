@@ -89,6 +89,24 @@ public class TableConfigService implements InitializingBean {
     }
 
     /**
+     * 查询某个表可以被修改的字段
+     */
+    public List<String> getModifiableFields(int tableId){
+        String tableName = this.getTableNameById(tableId);
+        JSONObject allJson=JSONObject.fromObject(greatMapper.getDesc(tableName));
+        JSONObject allFieldJson = allJson.getJSONObject("all");
+        List<String> ans = new ArrayList<>(allFieldJson.keySet().size());
+        for(Object key:allFieldJson.keySet()){
+            String fieldName = key.toString();
+            JSONObject config = allFieldJson.getJSONObject(fieldName);
+            if(config.get("modify").equals("true")){
+                ans.add(fieldName);
+            }
+        }
+        return ans;
+    }
+
+    /**
      * 获取META_DATA中对应表的matchKeys配置
      */
     @Cacheable(value = "tableConfigService", key="#tableId + 'MatchKeyField'")

@@ -5,6 +5,7 @@ import com.example.ggkgl.Mapper.GreatMapper;
 import com.example.ggkgl.Model.JobInfo;
 import com.example.ggkgl.Service.*;
 import net.sf.json.JSONObject;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jms.core.JmsMessagingTemplate;
@@ -14,6 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.annotation.Resource;
 import javax.naming.OperationNotSupportedException;
 import javax.servlet.http.HttpServletRequest;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.sql.SQLException;
 import java.util.*;
@@ -329,6 +333,16 @@ public class AllController {
         String password = params.getString("password");
         String tableName = params.getString("tableName");
         return MysqlHelper.getColumnNameOfTable(MysqlHelper.connectToRemoteMysqlServer(host,port,schema,user,password),tableName);
+    }
+
+    @GetMapping(value = "/download/template/excel/{tableId}")
+    public ResponseEntity<FileSystemResource> getExcelTemplate(@PathVariable("tableId")int tableId) throws IOException, OperationNotSupportedException {
+        Workbook workbook = this.dataTransmissionService.getExcelTemplateForImport(tableId);
+        File file = this.resourceService.createTmpFile("xlsx");
+        try(FileOutputStream outputStream = new FileOutputStream(file)){
+            workbook.write(outputStream);
+        }
+        return this.resourceService.download(file);
     }
 
 }
