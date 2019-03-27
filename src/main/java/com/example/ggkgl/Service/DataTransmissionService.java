@@ -7,11 +7,11 @@ import com.example.ggkgl.Component.Import.IImport;
 import com.example.ggkgl.Model.JobInfo;
 import net.sf.json.JSONObject;
 import org.apache.log4j.Logger;
-import org.apache.poi.hssf.usermodel.HSSFCell;
-import org.apache.poi.hssf.usermodel.HSSFRow;
-import org.apache.poi.hssf.usermodel.HSSFSheet;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -108,11 +108,11 @@ public class DataTransmissionService {
      * 获取用于Excel导入的模板
      */
     public Workbook getExcelTemplateForImport(int tableId){
-        HSSFWorkbook workbook = new HSSFWorkbook();
+        XSSFWorkbook workbook = new XSSFWorkbook();
         String sheetName = "sheet1";
-        HSSFSheet sheet = workbook.createSheet(sheetName);
-        HSSFRow row = sheet.createRow(0);
-        HSSFCell cell;
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+        XSSFRow row = sheet.createRow(0);
+        XSSFCell cell;
         List<String> title = this.tableConfigService.getModifiableFields(tableId);
         for(int i=0;i<title.size();i++){
             String attribute = title.get(i);

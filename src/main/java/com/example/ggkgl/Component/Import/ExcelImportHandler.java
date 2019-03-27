@@ -4,10 +4,7 @@ import com.example.ggkgl.AssitClass.ProcessCallBack;
 import com.example.ggkgl.Service.ResourceService;
 import net.sf.json.JSONObject;
 import org.apache.log4j.Logger;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Component;
 
 import javax.validation.constraints.NotNull;
@@ -62,7 +59,8 @@ public class ExcelImportHandler implements IImport{
                     int cellNumber = dataRow.getLastCellNum();
                     HashMap<String,String> data = new HashMap<>(cellNumber);
                     for(int k=0;k< cellNumber;k++){
-                        data.put(headerMap.get(k),dataRow.getCell(k).getStringCellValue());
+                        Cell cell = dataRow.getCell(k);
+                        data.put(headerMap.get(k), cell == null ? "" : cell.getStringCellValue());
                     }
                     result.add(data);
                     finishNumber++;
