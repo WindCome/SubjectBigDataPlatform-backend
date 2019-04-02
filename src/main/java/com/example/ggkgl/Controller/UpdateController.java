@@ -356,6 +356,16 @@ public class UpdateController {
         List<String> logContent = new ArrayList<>();
         logContent.add("运行于:"+log.getGenerateAtTime());
         logContent.add("爬取耗时: "+log.getSpendTime()+"ms");
+        logContent.add("上一次爬取链接统计:");
+        HashMap<String,Object> lastCount = log.getLastURLCount();
+        for(String url:lastCount.keySet()){
+            logContent.add(url+" "+lastCount.get(url));
+        }
+        logContent.add("本次爬取链接统计:");
+        HashMap<String,Object> count = log.getCurrentURLCount();
+        for(String url:count.keySet()){
+            logContent.add(url+" "+count.get(url));
+        }
         logContent.add("详情:");
         logContent.addAll(log.getDetailInfo());
         final String fileName = "spiderLog-"+System.currentTimeMillis()+".txt";

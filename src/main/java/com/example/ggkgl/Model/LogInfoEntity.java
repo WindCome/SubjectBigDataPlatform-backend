@@ -1,12 +1,14 @@
 package com.example.ggkgl.Model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import net.sf.json.JSONObject;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.redis.core.RedisHash;
 
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -31,6 +33,16 @@ public class LogInfoEntity implements Serializable{
     private String generateAtTime;
 
     /**
+     * lastURLCount的视图
+     */
+    private List<JSONObject> lastURLCountView = new ArrayList<>(0);
+
+    /**
+     * currentURLCount的视图
+     */
+    private List<JSONObject> currentURLCountView = new ArrayList<>(0);
+
+    /**
      * 某个过程花费的时间ms
      */
     private long spendTime;
@@ -43,11 +55,13 @@ public class LogInfoEntity implements Serializable{
     /**
      * 上一个版本的统计情况
      */
+    @JsonIgnore
     private HashMap<String,Object> lastURLCount = new HashMap<>(0);
 
     /**
      * 当前爬取链接的统计情况
      */
+    @JsonIgnore
     private HashMap<String,Object> currentURLCount = new HashMap<>(0);
 
     public LogInfoEntity() {
@@ -110,5 +124,28 @@ public class LogInfoEntity implements Serializable{
 
     public void setCurrentURLCount(HashMap<String, Object> currentURLCount) {
         this.currentURLCount = currentURLCount;
+    }
+
+    @Transient
+    public List<JSONObject> getLastURLCountView() {
+        this.lastURLCountView = this.convertURLCountMap2List(this.lastURLCount);
+        return lastURLCountView;
+    }
+
+    @Transient
+    public List<JSONObject> getCurrentURLCountView() {
+        this.currentURLCountView = this.convertURLCountMap2List(this.currentURLCount);
+        return currentURLCountView;
+    }
+
+    private List<JSONObject> convertURLCountMap2List(HashMap<String,Object> map){
+        List<JSONObject> result = new ArrayList<>(map.keySet().size());
+        for(String url:map.keySet()){
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("url",url);
+            jsonObject.put("count",map.get(url));
+            result.add(jsonObject);
+        }
+        return result;
     }
 }
