@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.RedisHash;
 
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -38,6 +39,16 @@ public class LogInfoEntity implements Serializable{
      * 日志详情
      */
     private List<String> detailInfo;
+
+    /**
+     * 上一个版本的统计情况
+     */
+    private HashMap<String,Object> lastURLCount = new HashMap<>(0);
+
+    /**
+     * 当前爬取链接的统计情况
+     */
+    private HashMap<String,Object> currentURLCount = new HashMap<>(0);
 
     public LogInfoEntity() {
     }
@@ -83,5 +94,21 @@ public class LogInfoEntity implements Serializable{
     public String getGenerateAtTime() {
         this.generateAtTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(this.generateTime);
         return this.generateAtTime;
+    }
+
+    public HashMap<String, Object> getLastURLCount() {
+        return lastURLCount;
+    }
+
+    public void setLastURLCount(HashMap<String, Object> lastURLCount) {
+        this.lastURLCount = lastURLCount;
+    }
+
+    public HashMap<String, Object> getCurrentURLCount() {
+        return currentURLCount;
+    }
+
+    public void setCurrentURLCount(HashMap<String, Object> currentURLCount) {
+        this.currentURLCount = currentURLCount;
     }
 }

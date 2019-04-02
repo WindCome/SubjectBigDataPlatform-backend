@@ -217,14 +217,16 @@ public class UpdateController {
                         private String redisKey;
                         @Override
                         public void onStart() {
-                            redisKey = UpdateController.this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+                            redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
                             this.dataDump = UpdateController.this.redisDataManagerService.getJsonDataList(redisKey);
                         }
                         @Override
                         public void onFinished() {
                             String oldVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
-                            UpdateController.this.redisVersionControlService.contrast(redisKey,dataDump,
-                                    UpdateController.this.redisDataManagerService.getJsonDataList(redisKey));
+                            if(UpdateController.this.redisVersionControlService.contrast(redisKey,dataDump,
+                                    UpdateController.this.redisDataManagerService.getJsonDataList(redisKey))){
+                                UpdateController.this.spiderService.onVersionChanged(tableId);
+                            }
                             String currentVersion = UpdateController.this.redisVersionControlService.getCurrentVersion(redisKey);
                             List<Pair> changeList = UpdateController.this.redisVersionControlService.getIndexChangeDetail(redisKey,oldVersion,currentVersion);
                             UpdateController.this.redisVersionControlService.resetIndex(redisKey, changeList);

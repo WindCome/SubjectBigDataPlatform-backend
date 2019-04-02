@@ -52,7 +52,7 @@ public class RedisDataManagerService {
     /**
     * 查询存放用于更新指定id的Mysql表的redis键值
      */
-    public String getSpiderDataRedisKey(int tableId){
+    public static String getSpiderDataRedisKey(int tableId){
         return "upgrade"+tableId;
     }
 

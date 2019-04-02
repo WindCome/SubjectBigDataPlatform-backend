@@ -1,15 +1,18 @@
 package com.example.ggkgl.Service;
 
 import com.example.ggkgl.AssitClass.ExceptionHelper;
+import com.example.ggkgl.AssitClass.JSONHelper;
 import com.example.ggkgl.Mapper.LogRepository;
 import com.example.ggkgl.Model.LogInfoEntity;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
+import redis.clients.jedis.Jedis;
 
 import javax.annotation.Resource;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -67,6 +70,7 @@ public class SpiderService {
             Thread thread = new Thread(() -> {
                 List<String> logInfo = new ArrayList<>();
                 LogInfoEntity logInfoEntity = new LogInfoEntity(tableId);
+                logInfoEntity.setLastURLCount(this.getURLCountOfLastTime(tableId));
                 StopWatch stopWatch = new StopWatch();
                 try {
                     ProcessBuilder processBuilder = new ProcessBuilder(execCommand.split(" "));
@@ -77,7 +81,7 @@ public class SpiderService {
                     }
                     stopWatch.start();
                     Process process = processBuilder.start();
-                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream(),"utf-8"));
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream(),"gbk"));
                     String line;
                     while ((line = bufferedReader.readLine()) != null){
                         SpiderService.this.logger.info(line);
@@ -86,6 +90,12 @@ public class SpiderService {
                     bufferedReader.close();
                     process.waitFor();
                     stopWatch.stop();
+                    logInfoEntity.setDetailInfo(logInfo);
+                    if(stopWatch.getTaskCount()!=0){
+                        logInfoEntity.setSpendTime(stopWatch.getLastTaskTimeMillis());
+                    }
+                    logInfoEntity.setCurrentURLCount(this.getURLCountOfThisTime(tableId));
+                    logInfoEntity = logRepository.save(logInfoEntity);
                     if(callBack!=null){
                         callBack.onFinished();
                     }
@@ -93,13 +103,11 @@ public class SpiderService {
                 catch (Exception e)
                 {
                     logInfo.add(ExceptionHelper.getExceptionAllInfo(e));
+                    logInfoEntity.setDetailInfo(logInfo);
+                    logRepository.save(logInfoEntity);
                     e.printStackTrace();
                 }
-                logInfoEntity.setDetailInfo(logInfo);
-                if(stopWatch.getTaskCount()!=0){
-                    logInfoEntity.setSpendTime(stopWatch.getLastTaskTimeMillis());
-                }
-                logRepository.save(logInfoEntity);
+
             });
             thread.start();
             this.spiderThreads.put(tableId,thread);
@@ -117,5 +125,31 @@ public class SpiderService {
     public LogInfoEntity getLastCrawlLog(int tableId){
         Optional<LogInfoEntity> optional = this.logRepository.findById(tableId);
         return optional.orElse(null);
+    }
+
+    private HashMap<String,Object> getURLCountOfThisTime(int tableId){
+        String redisKey = "urls_"+RedisDataManagerService.getSpiderDataRedisKey(tableId);
+        return this.getURLCount(redisKey);
+    }
+
+    private HashMap<String,Object> getURLCountOfLastTime(int tableId){
+        String redisKey = "backend_urls_"+RedisDataManagerService.getSpiderDataRedisKey(tableId);
+        return this.getURLCount(redisKey);
+    }
+
+    public void onVersionChanged(int tableId){
+        Jedis jedis = new Jedis();
+        String redisKey = "backend_urls_"+RedisDataManagerService.getSpiderDataRedisKey(tableId);
+        jedis.set(redisKey,JSONHelper.map2Json(this.getURLCountOfThisTime(tableId)));
+    }
+
+    private HashMap<String,Object> getURLCount(String redisKey){
+        Jedis jedis = new Jedis();
+        if(jedis.exists(redisKey)){
+            return JSONHelper.jsonStr2Map(jedis.get(redisKey));
+        }
+        else{
+            return new HashMap<>(0);
+        }
     }
 }

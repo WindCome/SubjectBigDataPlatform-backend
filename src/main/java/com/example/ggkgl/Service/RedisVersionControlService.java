@@ -82,7 +82,12 @@ public class RedisVersionControlService {
             return null;
         }
         System.out.println("detail "+data.get("detail"));
-        return (List<Pair>)data.get("detail");
+        List<JSONObject> list = (List<JSONObject>)data.get("detail");
+        List<Pair> result = new ArrayList<>(data.size());
+        for(JSONObject x:list){
+            result.add(new Pair(x.get("key"),x.get("value")));
+        }
+        return result;
     }
 
     /**
@@ -240,7 +245,7 @@ public class RedisVersionControlService {
             return new ArrayList<>(0);
         }
         List<Pair> invalidChange = new ArrayList<>();
-        List<Long> indexToChange = new ArrayList<>(indexChangeDetails.size());
+        List<Integer> indexToChange = new ArrayList<>(indexChangeDetails.size());
         this.lock.writeLock().lock();
         try{
             for(Pair change:indexChangeDetails){
@@ -253,7 +258,7 @@ public class RedisVersionControlService {
                     entity.setIndex(newIndex);
                     this.redisDataChangeRepository.save(entity);
                 }
-                indexToChange.add((Long)change.getKey());
+                indexToChange.add((Integer) change.getKey());
             }
             List<Long> historyList = this.redisDataChangeRepository.findIdAll();
             historyList.retainAll(indexToChange);
