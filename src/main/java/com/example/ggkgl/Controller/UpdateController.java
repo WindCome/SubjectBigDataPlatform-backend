@@ -239,12 +239,12 @@ public class UpdateController {
 
     /**
      * 查看某个爬取结果是否可用
-     * @param tid 生成更新数据接口返回的线程id
+     * @param tableId mysql表Id
      * @return  true可用，false不可用
      */
-    @GetMapping(value = "/generateUpgrade/result/{tid}")
-    public boolean isDataAvailable(@PathVariable("tid") int tid){
-        return this.spiderService.isSpiderCrawlFinish(tid);
+    @GetMapping(value = "/generateUpgrade/result/{tableId}")
+    public boolean isDataAvailable(@PathVariable("tableId") int tableId){
+        return this.spiderService.isSpiderCrawlFinish(tableId);
     }
 
     /**

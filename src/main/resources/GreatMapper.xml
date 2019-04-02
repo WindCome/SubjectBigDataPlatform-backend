@@ -43,12 +43,12 @@
     </select>
 
     <select id="comboSearch" statementType="STATEMENT" resultType="HashMap">
-        select * from ${tableName}
-        <if test="conditions != null and conditions.size() != 0">where</if>
+        select * from ${tableName} where
         <foreach collection="conditions" separator="and" item="condition" index="index">
             ${condition.key} like '%${condition.value}%'
         </foreach>
-        and deleted=false
+        <if test="conditions != null and conditions.size() != 0">and </if>
+        deleted=false
         <if test="start >=0 and length >=0">limit ${start} ,${length}</if>
     </select>
 
