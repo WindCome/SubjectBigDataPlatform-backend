@@ -8,7 +8,6 @@ import javax.persistence.*;
 import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.Collection;
-import java.util.List;
 
 /**
 * Mysql一组数据变更记录摘要

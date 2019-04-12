@@ -73,7 +73,7 @@ public class UpdateController {
     @GetMapping(value = "/version/{version}/index/{tableId}")
     public List<Pair> getIndexChangeList(@PathVariable("tableId") int tableId,
                                      @PathVariable(value = "version") String version) {
-        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        String redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
         String currentVersion = this.redisVersionControlService.getCurrentVersion(redisKey);
         return this.redisVersionControlService.getIndexChangeDetail(redisKey,version,currentVersion);
     }
@@ -94,7 +94,7 @@ public class UpdateController {
     {
         jsonObject.put("op", RedisDataManagerService.OperatorCode.UPDATE);
         jsonObject.put("index",index);
-        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        String redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
         Pair<Boolean,Object> ans = this.redisVersionControlService.recordModifyRedisData(redisKey,JSONHelper.json2Map(jsonObject));
         return this.handleModifyResult(ans,redisKey,index);
     }
@@ -113,7 +113,7 @@ public class UpdateController {
         HashMap params = new HashMap(2);
         params.put("op", RedisDataManagerService.OperatorCode.RESET);
         params.put("index",index);
-        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        String redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
         return this.handleModifyResult(this.redisVersionControlService.recordModifyRedisData(redisKey,params),
                                             redisKey,index);
     }
@@ -131,7 +131,7 @@ public class UpdateController {
         HashMap params = new HashMap(2);
         params.put("op", RedisDataManagerService.OperatorCode.DELETE);
         params.put("index",index);
-        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        String redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
         return this.handleModifyResult(this.redisVersionControlService.recordModifyRedisData(redisKey,params),
                                             redisKey,index);
     }
@@ -170,7 +170,7 @@ public class UpdateController {
     public boolean saveRedisData(@PathVariable("tableId") int tableId,@RequestBody List<Integer> indexList,ProcessCallBack processCallBack)
     {
         if(indexList == null){
-            String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+            String redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
             int size = this.redisDataManagerService.getSizeOfData(redisKey);
             indexList = IntStream.iterate(0, n -> n + 1).limit(size).boxed().collect(Collectors.toList());
         }else if(indexList.size() == 0){
@@ -179,7 +179,7 @@ public class UpdateController {
         String primaryKey = this.tableConfigService.getPrimaryKeyByTableId(tableId);
         List<HashMap> data = new ArrayList<>(indexList.size());
         for(int i : indexList){
-            String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+            String redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
             HashMap<String,Object> contrastResult = this.redisDataManagerService.getContrastResult(redisKey,i);
             String status = contrastResult.get("status").toString();
             HashMap<String,Object> opMap = new HashMap<>(3);
@@ -266,7 +266,7 @@ public class UpdateController {
                                    @RequestParam(value = "page",defaultValue = "1") int page,
                                    @RequestParam(value = "size",defaultValue = "20") int size)
     {
-        String redisKey = this.redisDataManagerService.getSpiderDataRedisKey(tableId);
+        String redisKey = RedisDataManagerService.getSpiderDataRedisKey(tableId);
         String currentVersion = this.redisVersionControlService.getCurrentVersion(redisKey);
         int updateCount=0;
         int newCount=0;
@@ -275,7 +275,7 @@ public class UpdateController {
         String targetType = (String)jsonObject.getOrDefault("status","all");
         HashMap condition = JSONHelper.jsonStr2Map(jsonObject.getOrDefault("condition","").toString());
         int dataSize =  this.redisDataManagerService.getSizeOfData(redisKey);
-        List<HashMap> contrastResultList = new ArrayList<>(dataSize);
+        List<HashMap> contrastResultList = new ArrayList<>(size);
         int startIndex = (page - 1) * size;
         int coincidentIndex = 0;
         for (int i = 0 ; i < dataSize ; i++){

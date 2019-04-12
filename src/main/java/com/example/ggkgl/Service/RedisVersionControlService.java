@@ -260,7 +260,7 @@ public class RedisVersionControlService {
                 }
                 indexToChange.add((Integer) change.getKey());
             }
-            List<Long> historyList = this.redisDataChangeRepository.findIdAll();
+            List<Long> historyList = this.redisDataChangeRepository.findId();
             historyList.retainAll(indexToChange);
             for(Long id:historyList){
                 this.redisDataChangeRepository.deleteById(id);
